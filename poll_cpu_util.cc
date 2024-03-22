@@ -11,27 +11,31 @@
 #include <vector>
 #include <sys/syscall.h>
 #include <sys/resource.h> 
+#include <sys/wait.h> 
+#include <fcntl.h>
+#include <linux/sched.h>
+#include <sched.h>
 #include <chrono>
 #include <ctime>
 #include <ratio>
 #include <thread>
-#include <mutex> 
 using namespace std;
 using namespace std::chrono;
 
 // sudo setcap cap_sys_nice=ep lnx_test
+// sudo setcap cap_sys_admin+ep lnx_test
+// don't forget to chown the cgroups
 
 static clock_t lastCPU, lastSysCPU, lastUserCPU;
 static int numProcessors;
 high_resolution_clock::time_point global_start;
-mutex thread_mtx;
 
 #define NUMITERS 500 // 100
-#define NUMTHREADS 25
-#define MATSZ 70 // 350
-#define THREAD_WAIT_TIME_MICROSEC 500
-#define THREAD_WAIT_TIME_MILLISEC 0 // 75
+#define NUM_5_MS_SLA 0
+#define NUM_50_MS_SLA 0 
+#define NUM_500_MS_SLA 1
 #define UTIL_CHECK_SLEEP_TIME_MILLISEC 5
+#define STACK_SIZE 1048576 // 1024 * 1024, like in man page example
 
 double timeDiff() {
     duration<double> time_span = duration_cast<duration<double>>(high_resolution_clock::now() - global_start);
@@ -40,10 +44,6 @@ double timeDiff() {
 
 std::vector<size_t> get_cpu_times() {
     std::ifstream proc_stat("/proc/stat");
-    // ofstream file;
-    // file.open("../proc_files.txt", ios::app);
-    // file << proc_stat.rdbuf() << endl << endl;
-    // file.close();
     proc_stat.ignore(5, ' '); // Skip the 'cpu' prefix.
     std::vector<size_t> times;
     for (size_t time; proc_stat >> time; times.push_back(time));
@@ -60,15 +60,6 @@ bool get_cpu_times(size_t &idle_time, size_t &total_time) {
 }
 
 void readCPU() {
-
-    cpu_set_t  mask;
-    CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
-    int result = sched_setaffinity(0, sizeof(mask), &mask);
-
-    if ( result > 0) {
-        cout << "set affinity had an error" << endl;
-    }
 
     size_t previous_idle_time=0, previous_total_time=0;
     int i = 0;
@@ -93,67 +84,8 @@ void readCPU() {
 }
 
 // The function we want to execute on each thread.
-void comp_intense(int* mat1, int* mat2, int thread_num, int matsz) {
-
-    // set affinity to force thread to run on core 0
-    cpu_set_t  mask;
-    CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
-    if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
-        cout << "set affinity had an error" << endl;
-    }
-
-    ofstream file1;
-    file1.open("../worker_out.txt", ios::app);
-    file1 << timeDiff() << ", " << thread_num << ", 1" << endl;
-    file1.close();
-
-    pid_t tid;
-    tid = syscall(SYS_gettid);
-    if (thread_num == 12) {
-        if (setpriority(PRIO_PROCESS, tid, -2) == -1) {
-            cout << "setprio failed: " << strerror(errno) << endl;
-        }
-    }
-    int ret = getpriority(PRIO_PROCESS, tid);
-    if(ret == -1) {
-        cout << "getprio failed" << strerror(errno) << endl;
-    }
-    
-    cout << thread_num << " is running on " << sched_getcpu() << ", with priority " << ret << endl;
-
-    ofstream file2;
-    file2.open("../worker_out.txt", ios::app);
-    file2 << timeDiff() << ", " << thread_num << ", 2" << endl;
-    file2.close();
-
-    high_resolution_clock::time_point beg = high_resolution_clock::now();
- 
-    // ============================
-    // multiply the matrices
-    // ============================
-    int rslt[matsz][matsz];
-    for (int i = 0; i < matsz; i++) {
-        for (int j = 0; j < matsz; j++) {
-            rslt[i][j] = 0;
-            for (int k = 0; k < matsz; k++) {
-                int offset1 = i * matsz + k; //mat1[i][k]
-                int offset2 = k * matsz + j; //mat2[k][j]
-                rslt[i][j] += mat1[offset1] * mat2[offset2];
-                // rslt[i][j] += offset1 * offset2;
-            }
-        }
-    }
-
-    high_resolution_clock::time_point end = high_resolution_clock::now();
-
-    duration<double> time_span = duration_cast<duration<double>>(end - beg);
-
-    ofstream file;
-    file.open("../worker_out.txt", ios::app);
-    file << timeDiff() << ", " <<  thread_num << ", " 
-        << 1000 * time_span.count() << ", -1" << endl; // 1000 => shows millisec; 1000000 => shows microsec
-    file.close();
+void comp_intense() {
+    sleep(60);
 }
 
 void emptyFiles() {
@@ -176,68 +108,87 @@ void emptyFiles() {
 
 }
 
-int main() {
 
-    cout << "pid: " << getpid() << endl;
+int main() {
 
     emptyFiles();
 
-    // setup
-    srand(time(NULL));
-
-
-    // ============================
-    // generate the matrices
-    // ============================
-    int matsz = MATSZ;
-    int *mat1 = (int *)malloc(matsz * matsz * sizeof(int));
-    for (int r = 0; r < matsz; r++) {
-        for (int c = 0; c < matsz; c++) {
-            int offset = r * matsz + c;
-            mat1[offset] = rand();
-        }
+    int fd_500 = open("/sys/fs/cgroup/three-digit-ms/cgroup.procs", O_RDWR);
+    if(fd_500 == -1) {
+        cout << "open failed: " << strerror(errno) << endl;
+    }
+    int fd_50 = open("/sys/fs/cgroup/two-digit-ms/cgroup.procs", O_RDWR);
+    if(fd_50 == -1) {
+        cout << "open failed: " << strerror(errno) << endl;
+    }
+    int fd_5 = open("/sys/fs/cgroup/single-digit-ms/cgroup.procs", O_RDWR);
+    if(fd_5 == -1) {
+        cout << "open failed: " << strerror(errno) << endl;
     }
 
-    int *mat2 = (int *)malloc(matsz * matsz * sizeof(int));
-    for (int r = 0; r < matsz; r++) {
-        for (int c = 0; c < matsz; c++) {
-            int offset = r * matsz + c;
-            mat2[offset] = rand();
-        }
-    }
+    cout << "fd_500: " << fd_500 << endl;
+    cout << "fd_50: " << fd_50 << endl;
+    cout << "fd_5: " << fd_5 << endl;
 
     global_start = high_resolution_clock::now();
     
-
     // start cpu reading, give a second to generate a baseline
-    thread measure(readCPU);
-    sleep(1);
+    // thread measure(readCPU);
+    // sleep(1);
 
-    std::vector<thread> threads;
-
-    // measure without contention
-    thread t(comp_intense, mat1, mat2, -1, MATSZ);
-    threads.push_back(std::move(t));
-    sleep(1);
+    std::vector<pid_t> procs;
     
-    // Constructs the new thread and runs it. Does not block execution.
-    for(int i=0; i<NUMTHREADS; i++) {
-        thread t(comp_intense, mat1, mat2, i, MATSZ);
-        threads.push_back(std::move(t));
-        // write start time to file
-        ofstream file;
-        file.open("../worker_out.txt", ios::app);
-        file << timeDiff() << ", " << i << ", 0" << endl;
-        file.close();
-        // potentiall wait
-        std::this_thread::sleep_for(std::chrono::milliseconds(THREAD_WAIT_TIME_MILLISEC));
-        std::this_thread::sleep_for(std::chrono::microseconds(THREAD_WAIT_TIME_MICROSEC));
+    for(int i=0; i<(NUM_5_MS_SLA + NUM_50_MS_SLA + NUM_500_MS_SLA); i++) {
+
+        __u64 stack = (__u64)malloc(STACK_SIZE);
+
+        int fd_to_use = -1;
+         if (i < NUM_500_MS_SLA) {
+            cout << "giving fd 500 " << endl;
+            fd_to_use = fd_500;
+        } else if (i < (NUM_500_MS_SLA + NUM_50_MS_SLA)) {
+            cout << "giving fd 50 " << endl;
+            fd_to_use = fd_50;
+        } else {
+            cout << "giving fd 5" << endl;
+            fd_to_use = fd_5;
+        }
+
+        struct clone_args args = {
+            .flags = CLONE_VM | CLONE_INTO_CGROUP,
+            .exit_signal = SIGCHLD,
+            .stack = stack,
+            .stack_size = STACK_SIZE,
+            .cgroup = fd_to_use,
+        }; 
+
+        
+        int c_pid = syscall(SYS_clone3, &args, sizeof(struct clone_args));
+  
+        if (c_pid == -1) { 
+            cout << "clone3 failed: " << strerror(errno) << endl;
+            perror("clone3"); 
+            exit(EXIT_FAILURE); 
+        } else if (c_pid > 0) { 
+            // if parent, add pid to list
+            procs.push_back(c_pid);
+            cout << "child pid: " << c_pid << endl;
+            // write start time to file
+            // ofstream file;
+            // file.open("../worker_out.txt", ios::app);
+            // file << timeDiff() << ", " << i << ", 0" << endl;
+            // file.close();
+        } else { 
+            // if child, execute intense compute
+            comp_intense();
+            // break from loop
+            break;
+        }   
     }
 
-    // Makes the main thread wait for the new thread to finish execution, therefore blocks its own execution.
-    for(auto& t : threads){ 
-        t.join();
+    for(auto& c_pid : procs){ 
+        waitpid(c_pid, NULL, 0);
     }
-    measure.join();
+    // measure.join();
 }
 
