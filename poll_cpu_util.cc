@@ -84,17 +84,7 @@ void readCPU() {
 // The function we want to execute on each thread.
 void comp_intense(int worker_num, int type) {
 
-    cpu_set_t mask;
-    long nproc, i;
-    if (sched_getaffinity(0, sizeof(cpu_set_t), &mask) == -1) {
-        perror("sched_getaffinity");
-    }
-    nproc = sysconf(_SC_NPROCESSORS_ONLN);
-    cout << worker_num << " affinity: ";
-    for (i = 0; i < nproc; i++) {
-        cout <<  CPU_ISSET(i, &mask) << " ";
-    }
-   cout << endl;
+    cout << worker_num << " is running on " << sched_getcpu() << endl;
 
     ofstream file;
     file.open("../worker_out.txt", ios::app);
@@ -159,23 +149,11 @@ int main() {
 
     cpu_set_t  mask;
     CPU_ZERO(&mask);
-    CPU_SET(0, &mask);
+    CPU_SET(1, &mask);
     if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
         cout << "set affinity had an error" << endl;
     }
-
-    cpu_set_t mask_2;
-    long nproc, i;
-    if (sched_getaffinity(0, sizeof(cpu_set_t), &mask_2) == -1) {
-        perror("sched_getaffinity");
-    }
-    nproc = sysconf(_SC_NPROCESSORS_ONLN);
-    cout << "parent affinity: ";
-    for (i = 0; i < nproc; i++) {
-       cout << CPU_ISSET(i, &mask_2) << " ";
-    }
-    cout << endl;
-
+    cout << "parent is running on " << sched_getcpu() << endl;
 
     emptyFiles();
 
@@ -236,17 +214,6 @@ int main() {
             perror("fork"); 
             exit(EXIT_FAILURE); 
         } else if (c_pid > 0) { 
-                    
-            long j;
-            if (sched_getaffinity(0, sizeof(cpu_set_t), &mask_2) == -1) {
-                perror("sched_getaffinity");
-            }
-            cout << "parent affinity after fork: ";
-            for (j = 0; j < nproc; j++) {
-                cout << CPU_ISSET(j, &mask_2) << " ";
-            }
-            cout << endl;
-
             is_parent = true;
             cout << "parent: child pid is " << c_pid << " with type " << type << endl;
             // if parent, write child pid to cgroup
@@ -263,16 +230,13 @@ int main() {
             file << timeDiff() << ", " << i << ", " << type << ", 0" << endl;
             file.close();
         } else {
-            long j;
-            if (sched_getaffinity(0, sizeof(cpu_set_t), &mask_2) == -1) {
-                perror("sched_getaffinity");
+            // set child affinity
+            cpu_set_t  mask;
+            CPU_ZERO(&mask);
+            CPU_SET(0, &mask);
+            if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
+                cout << "set affinity had an error" << endl;
             }
-            cout << "child affinity after fork: ";
-            for (j = 0; j < nproc; j++) {
-                cout << CPU_ISSET(j, &mask_2) << " ";
-            }
-            cout << endl;
-
             is_parent = false;
             // if child, execute intense compute
             comp_intense(i, type);
