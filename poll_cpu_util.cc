@@ -120,7 +120,7 @@ int main() {
     if(fd_50 == -1) {
         cout << "open failed: " << strerror(errno) << endl;
     }
-    int fd_5 = open("/sys/fs/cgroup/single-digit-ms/cgroup.procs", O_RDWR | O_APPEND);
+    int fd_5 = open("/sys/fs/cgroup/one-digit-ms/cgroup.procs", O_RDWR | O_APPEND);
     if(fd_5 == -1) {
         cout << "open failed: " << strerror(errno) << endl;
     }
