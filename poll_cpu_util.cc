@@ -22,15 +22,11 @@
 using namespace std;
 using namespace std::chrono;
 
-static clock_t lastCPU, lastSysCPU, lastUserCPU;
-static int numProcessors;
 high_resolution_clock::time_point global_start;
 
-#define NUMITERS 500 // 100
 #define NUM_5_MS_SLA 1
 #define NUM_50_MS_SLA 1
 #define NUM_500_MS_SLA 1
-#define UTIL_CHECK_SLEEP_TIME_MILLISEC 5
 #define TO_FACTOR_500 87465353
 #define TO_FACTOR_50 87465352
 #define TO_FACTOR_5 87465351
@@ -38,47 +34,6 @@ high_resolution_clock::time_point global_start;
 double timeDiff() {
     duration<double> time_span = duration_cast<duration<double>>(high_resolution_clock::now() - global_start);
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
-}
-
-std::vector<size_t> get_cpu_times() {
-    std::ifstream proc_stat("/proc/stat");
-    proc_stat.ignore(5, ' '); // Skip the 'cpu' prefix.
-    std::vector<size_t> times;
-    for (size_t time; proc_stat >> time; times.push_back(time));
-    return times;
-}
-
-bool get_cpu_times(size_t &idle_time, size_t &total_time) {
-    const std::vector<size_t> cpu_times = get_cpu_times();
-    if (cpu_times.size() < 4)
-        return false;
-    idle_time = cpu_times[3];
-    total_time = std::accumulate(cpu_times.begin(), cpu_times.end(), 0);
-    return true;
-}
-
-void readCPU() {
-
-    size_t previous_idle_time=0, previous_total_time=0;
-    int i = 0;
-    for (size_t idle_time, total_time; get_cpu_times(idle_time, total_time); std::this_thread::sleep_for(chrono::milliseconds(UTIL_CHECK_SLEEP_TIME_MILLISEC))) {
-        if(i > NUMITERS) {
-            return;
-        }
-        const float idle_time_delta = idle_time - previous_idle_time;
-        const float total_time_delta = total_time - previous_total_time;
-        const float utilization = 100.0 * (1.0 - idle_time_delta / total_time_delta);
-
-        ofstream file;
-        file.open("../polling_info.txt", ios::app);
-        file << timeDiff() << ", " << utilization << endl;
-        file.close();
-
-        previous_idle_time = idle_time;
-        previous_total_time = total_time;
-        i++;
-    }
-
 }
 
 // The function we want to execute on each thread.
@@ -170,13 +125,7 @@ int main() {
         cout << "open failed: " << strerror(errno) << endl;
     }
 
-    cout << "parent pid is " << getpid() << endl;
-
     global_start = high_resolution_clock::now();
-    
-    // start cpu reading, give a second to generate a baseline
-    // thread measure(readCPU);
-    // sleep(1);
 
     std::vector<pid_t> procs;
 
@@ -186,16 +135,6 @@ int main() {
 
         int fd_to_use;
         int type;
-        // if (i < NUM_500_MS_SLA) {
-        //     fd_to_use = fd_500;
-        //     type = 500;
-        // } else if (i < (NUM_500_MS_SLA + NUM_50_MS_SLA)) {
-        //     fd_to_use = fd_50;
-        //     type = 50;
-        // } else {
-        //     fd_to_use = fd_5;
-        //     type = 5;
-        // }
         if (i < NUM_5_MS_SLA) {
             fd_to_use = fd_5;
             type = 5;
@@ -245,32 +184,13 @@ int main() {
         }   
     }
     if (is_parent) {
-        close(fd_500);
-        close(fd_50);
-        close(fd_5);
-
-        ifstream f500("/sys/fs/cgroup/three-digit-ms/cgroup.procs");
-        if (f500.is_open()) {
-            cout << "pid " << getpid() << ": 500 procs file: " << f500.rdbuf();
-        } else {
-            cout << "500 file not open?" << endl;
-        }
-        ifstream f50("/sys/fs/cgroup/two-digit-ms/cgroup.procs");
-        if (f50.is_open()) {
-            cout << "pid " << getpid() << ": 50 procs file: " << f50.rdbuf();
-        } else {
-            cout << "50 file not open?" << endl;
-        }
-        ifstream f5("/sys/fs/cgroup/single-digit-ms/cgroup.procs");
-        if (f5.is_open()) {
-            cout << "pid " << getpid() << ": 5 procs file: " << f5.rdbuf();
-        } else {
-            cout << "5 file not open?" << endl;
-        }
-
         for(auto& c_pid : procs){ 
             waitpid(c_pid, NULL, 0);
         }
+
+        close(fd_500);
+        close(fd_50);
+        close(fd_5);
     }
 }
 
