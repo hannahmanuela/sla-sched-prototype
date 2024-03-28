@@ -27,14 +27,16 @@ high_resolution_clock::time_point global_start;
 #define NUM_5_MS_SLA 1
 #define NUM_50_MS_SLA 1
 #define NUM_500_MS_SLA 1
-#define TO_FACTOR_500 87465353
-#define TO_FACTOR_50 87465352
-#define TO_FACTOR_5 87465351
+#define TO_FACTOR_500 93695353
+#define TO_FACTOR_50  9768565
+#define TO_FACTOR_5   964653
 
 double timeDiff() {
     duration<double> time_span = duration_cast<duration<double>>(high_resolution_clock::now() - global_start);
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
 }
+
+
 
 // The function we want to execute on each thread.
 void comp_intense(int worker_num, int type) {
