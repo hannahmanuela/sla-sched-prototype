@@ -41,7 +41,7 @@ double timeDiff() {
 // The function we want to execute on each thread.
 void comp_intense(int worker_num, int type) {
 
-    cout << worker_num << " is running on " << sched_getcpu() << endl;
+    cout << "child " << worker_num << ", with pid " << getpid() << " and type " << type << " is running on " << sched_getcpu() << endl;
 
     ofstream file;
     file.open("../worker_out.txt", ios::app);
@@ -106,23 +106,22 @@ int main() {
 
     cpu_set_t  mask;
     CPU_ZERO(&mask);
-    CPU_SET(1, &mask);
+    CPU_SET(0, &mask);
     if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
         cout << "set affinity had an error" << endl;
     }
-    cout << "parent is running on " << sched_getcpu() << endl;
 
     emptyFiles();
 
-    int fd_500 = open("/sys/fs/cgroup/three-digit-ms/cgroup.procs", O_RDWR | O_APPEND);
+    int fd_500 = open("/sys/fs/cgroup/three-digit-ms", O_RDONLY); // given cpu.weight 10000
     if(fd_500 == -1) {
         cout << "open failed: " << strerror(errno) << endl;
     }
-    int fd_50 = open("/sys/fs/cgroup/two-digit-ms/cgroup.procs", O_RDWR | O_APPEND);
+    int fd_50 = open("/sys/fs/cgroup/two-digit-ms", O_RDONLY); // given cpu.weight 100
     if(fd_50 == -1) {
         cout << "open failed: " << strerror(errno) << endl;
     }
-    int fd_5 = open("/sys/fs/cgroup/one-digit-ms/cgroup.procs", O_RDWR | O_APPEND);
+    int fd_5 = open("/sys/fs/cgroup/one-digit-ms", O_RDONLY); // given cpu.weight 1
     if(fd_5 == -1) {
         cout << "open failed: " << strerror(errno) << endl;
     }
@@ -137,18 +136,23 @@ int main() {
 
         int fd_to_use;
         int type;
-        if (i < NUM_5_MS_SLA) {
-            fd_to_use = fd_5;
-            type = 5;
-        } else if (i < (NUM_5_MS_SLA + NUM_50_MS_SLA)) {
+        if (i < NUM_500_MS_SLA) {
+            fd_to_use = fd_500;
+            type = 500;
+        } else if (i < (NUM_500_MS_SLA + NUM_50_MS_SLA)) {
             fd_to_use = fd_50;
             type = 50;
         } else {
-            fd_to_use = fd_500;
-            type = 500;
+            fd_to_use = fd_5;
+            type = 5;
         }
 
-        int c_pid = fork();
+        struct clone_args args = {
+            .flags = CLONE_INTO_CGROUP,
+            .exit_signal = SIGCHLD,
+            .cgroup = fd_to_use,
+            };
+        int c_pid = syscall(SYS_clone3, &args, sizeof(struct clone_args));
   
         if (c_pid == -1) { 
             cout << "fork failed: " << strerror(errno) << endl;
@@ -156,14 +160,7 @@ int main() {
             exit(EXIT_FAILURE); 
         } else if (c_pid > 0) { 
             is_parent = true;
-            cout << "parent: child pid is " << c_pid << " with type " << type << endl;
-            // if parent, write child pid to cgroup
-            string to_write = to_string(c_pid) + "\n";
-            size_t nb = write(fd_to_use, to_write.c_str(), to_write.size());
-            if (nb == -1) {
-                perror("Error writing");
-            }
-            // add pid to list
+            // if parent, add pid to list
             procs.push_back(c_pid);
             // write start time to file
             ofstream file;
@@ -171,14 +168,15 @@ int main() {
             file << timeDiff() << ", " << i << ", " << type << ", 0" << endl;
             file.close();
         } else {
-            // set child affinity
+            is_parent = false;
+            // setting affinity manually for now
             cpu_set_t  mask;
             CPU_ZERO(&mask);
-            CPU_SET(0, &mask);
+            CPU_SET(1, &mask);
+            // CPU_SET(2, &mask);
             if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
                 cout << "set affinity had an error" << endl;
             }
-            is_parent = false;
             // if child, execute intense compute
             comp_intense(i, type);
             // break from loop
