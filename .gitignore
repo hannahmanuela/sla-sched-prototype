@@ -1,7 +1,3 @@
 build/**
 .vscode/**
-polling_info.txt
-worker_out.txt
-stats.txt
-mat_sz_rt_dist.txt
-worker_ops.txt
+*.txt
