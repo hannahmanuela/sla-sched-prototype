@@ -68,7 +68,7 @@ void Website::gen_load(int lb_conn_fd) {
         // send "proc"
         vector<const char*> command;
         command.push_back(executable);
-        Proc* proc = new Proc(sla, command, static_page_get);
+        Proc* proc = new Proc(sla, command, type);
         Message to_send = Message(-1, false, proc);
         char buffer[BUF_SZ];
         to_send.to_bytes(buffer);
