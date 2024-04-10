@@ -13,14 +13,16 @@ class Queue {
     public:
         Queue() {
             std::vector<Proc*> q_;
+            std::mutex lock_;
         };
 
         // this is ok I think because when I loop it is evaluated only once (so loop may become stale while its running but vec won't change under its feet)
         // https://stackoverflow.com/questions/16259574/c11-range-based-for-loops-evaluate-once-or-multiple-times
         std::vector<Proc*> get_q() {
             lock_.lock();
-            return q_; 
+            std::vector<Proc*> curr_q = q_; 
             lock_.unlock();
+            return curr_q;
         }
 
         void enq(Proc* to_add) {

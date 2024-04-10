@@ -60,7 +60,7 @@ class Proc {
         }
 
         void print() {
-            cout << "sla: " << sla_ << ", time_spawned: " << time_spawned_ << ", executable: " << command_[0] << endl;
+            cout << "sla: " << sla_ << ", time_spawned: " << time_spawned_ << ", type: " << type_ << endl;
         }
 
         
@@ -76,9 +76,10 @@ class Proc {
         void exec_proc() { 
             // need a null-terminated vector
             command_.push_back(NULL); 
-            cout << "about to exec proc" << endl;
-            execv(command_[0], const_cast<char* const*>(command_.data()));
-            cout << "proc done?" << endl;
+            int ret = execv(command_[0], const_cast<char* const*>(command_.data()));
+            if (ret < 0) {
+                perror("ERROR running proc");
+            }
         }
 
 

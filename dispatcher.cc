@@ -74,7 +74,6 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         .cgroup = (__u64)fd_to_use,
         };
     cout << "about to clone" << endl;
-    to_run->set_time_spawned(time_since_start_());
     int c_pid = syscall(SYS_clone3, &args, sizeof(struct clone_args));
 
     if (c_pid == -1) { 
@@ -83,25 +82,20 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         exit(EXIT_FAILURE); 
     } else if (c_pid > 0) { 
         // PARENT
-        cout << "in parent" << endl;
         // add proc to active q
         active_q_->enq(to_run);
         // wait for proc to finish
         waitpid(c_pid, NULL, 0);
-        cout << "parent: after waitpid" << endl;
         double runtime = to_run->get_time_since_spawn(time_since_start_());
         // TODO: how to get mem?
         float mem_used = get_mem_usage_(c_pid);
         // remove it from active q
-        cout << "rem from active" << endl;
         active_q_->remove(to_run);
         // write accounting into a file (like I did in the simulator)
-        cout << "write to file" << endl;
         ofstream file;
         file.open("../procs_done.txt", ios::app);
         file << time_since_start_() << ", " <<  id << ", " << to_run->get_type() << ", " << to_run->get_sla() << ", " << runtime << endl;
         // update profile
-        cout << "update profile" << endl;
         ProcTypeProfile* profile = get_profile(to_run->get_type());
         if (profile != nullptr) {
             profile->compute->update(runtime);
@@ -110,15 +104,21 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
             ProcTypeProfile* new_profile = new ProcTypeProfile(mem_used, runtime);
             proc_type_profiles_.push_back(new_profile);
         }
-        
-        // free the procs mem?
+        // free the procs mem? I think this just calls the desctructor?
         free(to_run);
     } else {
-        cout << "in child" << endl;
-        // setting affinity manually for now
-        if ( sched_setaffinity(0, sizeof(mask_), &mask_) > 0) {
+        // setting affinity manually for now - use all cores not used by the lb/website or dispatcher
+        cpu_set_t mask;
+        CPU_ZERO(&mask);
+        for (int i = 0; i < TOTAL_NUM_CPUS; i++) {
+            if (i != CORE_DISPATCHER_RUNS_ON && i != CORE_LB_WEBSITE_RUN_ON) {
+                CPU_SET(i, &mask);
+            }
+        }
+        if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
             cout << "set affinity had an error" << endl;
         }
+        cout << "worker process: " << getpid() << endl;
         // if child, execute intense compute
         to_run->exec_proc();
     }
@@ -128,6 +128,8 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
 
     vector<std::thread> procs;
 
+    cout << "dispatcher running lb conn: " << getpid() << endl;
+
     // listen on LB connection, take incoming proc reqs, clone for each
     while(1) {
         char buffer[BUF_SZ];
@@ -135,6 +137,9 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         if (n < 0) {
             perror("ERROR reading from socket");
             break;
+        } else if (n == 0) {
+            cout << "lb died, we return" << endl;
+            return;
         }
         Message lb_msg = Message();
         lb_msg.from_bytes(buffer);
@@ -146,13 +151,17 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         cout << "got proc from lb: ";
         lb_msg.msg_proc->print();
 
+        lb_msg.msg_proc->set_time_spawned(time_since_start_());
+
         // add to hold q or active q? 
         // should adding it to active q be what actually runs clone and exec?
         if (lb_msg.msg_proc->get_sla() < THRESHOLD_PUSH_SLA) {
             std::thread t(&Dispatcher::add_run_active_proc_, this, lb_msg.msg_proc);
             procs.push_back(std::move(t));
         } else {
+            cout << "adding to holdq" << endl;
             hold_q_->enq(lb_msg.msg_proc);
+            cout << "added" << endl;
         }
     }
     
@@ -196,39 +205,73 @@ void Dispatcher::create_run_lb_conn_() {
 
 void Dispatcher::run_holdq_() {
 
+    cout << "dispatcher running holdq: " << getpid() << endl;
+
+    vector<std::thread> active_procs;
+
     while (1) {
         for (Proc* p : hold_q_->get_q()) {
-            if ((p->get_time_since_spawn(time_since_start_()) / p->get_sla()) > THRESHOLD_PUSH_TIME_PASSED_TO_SLA_RATIO) {
+            if (((p->get_time_since_spawn(time_since_start_()) / p->get_sla()) > THRESHOLD_PUSH_TIME_PASSED_TO_SLA_RATIO)) {
+                cout << "pushing proc from holdq b/c it passed ratio" << endl;
                 hold_q_->remove(p);
+                std::thread t(&Dispatcher::add_run_active_proc_, this, p);
+                active_procs.push_back(std::move(t));
+            } else if ((active_q_->get_q().size() < 2)) {
+                cout << "pushing proc from holdq b/c active empty enough" << endl;
+                hold_q_->remove(p);
+                std::thread t(&Dispatcher::add_run_active_proc_, this, p);
+                active_procs.push_back(std::move(t));
             }
         }
         std::this_thread::sleep_for(chrono::milliseconds(HOLDQ_CHECK_SLEEP_TIME_MILLISEC));
+    }
+
+    for(auto& t : active_procs){ 
+        t.join();
     }
     
 }
 
 void Dispatcher::run() {
 
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(CORE_DISPATCHER_RUNS_ON, &mask);
+    if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
+        cout << "set affinity had an error" << endl;
+    }
+
     start_time_ = std::chrono::high_resolution_clock::now();
+
+    cout << "dispatcher main process: " << getpid() << endl;
 
     std::thread hold(&Dispatcher::run_holdq_, this);
     std::thread lb(&Dispatcher::create_run_lb_conn_, this);
 
-    // TODO: what does a graceful exit look like?
-    hold.join();
+    // "graceful" exit: if the lb conn is done, we are done
     lb.join();
 }
 
 
 
+void empty_files() {
+    ofstream procs_done_file;
+    procs_done_file.open("../procs_done.txt");
+    procs_done_file << "";
+    procs_done_file.close();
+}
+
 
 
 
 int main() {
+    empty_files();
+    
     // create dispatcher instance
     std::vector<ProcTypeProfile*> profiles;
 
-    Dispatcher d = Dispatcher(profiles);
+    // TODO: just hardcoding id for now, should probably get it from the lb
+    Dispatcher d = Dispatcher(profiles, 0);
     // run it
     d.run();
 }

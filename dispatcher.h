@@ -18,7 +18,8 @@ class Dispatcher {
     public:
         int id;
 
-        Dispatcher(std::vector<ProcTypeProfile*> proc_type_profiles) {
+        Dispatcher(std::vector<ProcTypeProfile*> proc_type_profiles, int id_given) {
+            id = id_given;
             proc_type_profiles_ = proc_type_profiles;
             active_q_ = new Queue();
             hold_q_ = new Queue();
@@ -38,12 +39,6 @@ class Dispatcher {
             }
 
             cout << "inited fds: " << fd_one_digit_ms_cgroup_ << ", " << fd_two_digit_ms_cgroup_ << ", " << fd_three_digit_ms_cgroup_ << endl;
-
-            cpu_set_t  mask_;
-            CPU_ZERO(&mask_);
-            CPU_SET(1, &mask_);
-            CPU_SET(2, &mask_);
-            CPU_SET(3, &mask_);
         };
 
         ProcTypeProfile* get_profile (ProcType type) { 
@@ -66,7 +61,6 @@ class Dispatcher {
         int fd_one_digit_ms_cgroup_;
         int fd_two_digit_ms_cgroup_;
         int fd_three_digit_ms_cgroup_;
-        cpu_set_t  mask_;
 
         std::vector<ProcTypeProfile*> proc_type_profiles_;
 

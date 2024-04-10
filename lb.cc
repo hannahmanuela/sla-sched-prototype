@@ -41,6 +41,7 @@ void LB::listen_and_accept_machines_() {
     
     cout << "listening for machines" << endl;
     // accept connections as they come in
+    // TODO: at some point we will need to deal with machines leaving
     while (1) {
         if ((machine_conn_fd= accept(listen_fd, (struct sockaddr*)&address,
                   &addrlen)) < 0) {
@@ -112,6 +113,9 @@ void LB::handle_client_conn_(int client_conn_fd) {
         int n = read(client_conn_fd, read_buffer, BUF_SZ);
         if (n < 0) {
             perror("ERROR reading from socket");
+        } else if (n == 0) {
+            cout << "client died";
+            return;
         }
         Message client_msg = Message();
         client_msg.from_bytes(read_buffer);
@@ -140,6 +144,15 @@ void LB::handle_client_conn_(int client_conn_fd) {
 }
 
 void LB::run() {
+
+    cpu_set_t mask;
+    CPU_ZERO(&mask);
+    CPU_SET(CORE_LB_WEBSITE_RUN_ON, &mask);
+    if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
+        cout << "set affinity had an error" << endl;
+    }
+
+    cout << "LB main process: " << getpid() << endl;
 
     std::thread machine_thread(&LB::listen_and_accept_machines_, this);
     std::thread client_thread(&LB::listen_and_accept_clients_, this);

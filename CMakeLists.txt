@@ -2,6 +2,8 @@ project(sla-sched)
 cmake_minimum_required(VERSION 3.22)
 
 add_executable(static_page_get static_page_get.cc)
+add_executable(dynamic_page_get dynamic_page_get.cc)
+add_executable(data_process_fg data_process_fg.cc)
 
 add_executable(dispatcher dispatcher.cc)
 

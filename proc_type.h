@@ -35,7 +35,7 @@ class Distribution {
 #ifndef PROC_TYPE_PROFILE_H
 #define PROC_TYPE_PROFILE_H
 
-enum ProcType { static_page_get, dynamic_page_get, fg_data_process, bg_data_process };
+enum ProcType { static_page_get, dynamic_page_get, data_process_fg, data_process_bg };
 
 class ProcTypeProfile {
 

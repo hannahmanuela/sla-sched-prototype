@@ -3,7 +3,7 @@
 
 int main() {
 
-    int to_factor = 964653;
+    int to_factor = 9768565;
     std::vector<int> factors;
 
     for (int i = 1; i <= to_factor; i++) {
