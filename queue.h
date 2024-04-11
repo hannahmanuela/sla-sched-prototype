@@ -27,7 +27,7 @@ class Queue {
 
         void enq(Proc* to_add) {
             lock_.lock();
-            q_.push_back(to_add); 
+            q_.insert(std::upper_bound(q_.begin(), q_.end(), to_add, [](Proc* a, Proc* b) {return a->get_sla() < b->get_sla();}), to_add);
             lock_.unlock();
         }
 

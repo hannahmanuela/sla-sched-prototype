@@ -74,7 +74,6 @@ class Dispatcher {
         void run_holdq_();
 
         int time_since_start_();
-        float get_mem_usage_(int pid);
 
 };
 

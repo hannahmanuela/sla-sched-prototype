@@ -1,9 +1,8 @@
 #include <vector>
 
-
 int main() {
 
-    int to_factor = 964653;
+    int to_factor = 234253;
     std::vector<int> factors;
 
     for (int i = 1; i <= to_factor; i++) {

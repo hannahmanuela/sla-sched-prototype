@@ -8,6 +8,7 @@
 #include <syscall.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <thread>
 #include <fstream>
 
@@ -18,41 +19,6 @@
 int Dispatcher::time_since_start_() {
     std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_time_);
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
-}
-
-float Dispatcher::get_mem_usage_(int pid) {
-   using std::ios_base;
-   using std::ifstream;
-   using std::string;
-
-   float vm_usage     = 0.0;
-
-   // 'file' stat seems to give the most reliable results
-   std::string file_name = "/proc/";
-   file_name += std::to_string(pid);
-   file_name += "/stat";
-   ifstream stat_stream(file_name ,ios_base::in);
-
-   // dummy vars for leading entries in stat that we don't care about
-   //
-   string pid_, comm, state, ppid, pgrp, session, tty_nr;
-   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-   string utime, stime, cutime, cstime, priority, nice;
-   string O, itrealvalue, starttime;
-
-   unsigned long vsize;
-
-   stat_stream >> pid_ >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
-               >> utime >> stime >> cutime >> cstime >> priority >> nice
-               >> O >> itrealvalue >> starttime >> vsize; // don't care about the rest
-
-   stat_stream.close();
-
-   long page_size_kb = sysconf(_SC_PAGE_SIZE) / 1024; // in case x86-64 is configured to use 2MB pages
-   vm_usage     = vsize / 1024.0;
-
-   return vm_usage;
 }
 
 // runs in a thread
@@ -73,7 +39,6 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         .exit_signal = SIGCHLD,
         .cgroup = (__u64)fd_to_use,
         };
-    cout << "about to clone" << endl;
     int c_pid = syscall(SYS_clone3, &args, sizeof(struct clone_args));
 
     if (c_pid == -1) { 
@@ -85,16 +50,18 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         // add proc to active q
         active_q_->enq(to_run);
         // wait for proc to finish
-        waitpid(c_pid, NULL, 0);
-        double runtime = to_run->get_time_since_spawn(time_since_start_());
-        // TODO: how to get mem?
-        float mem_used = get_mem_usage_(c_pid);
+        struct rusage usage_stats;
+        wait4(c_pid, NULL, 0, &usage_stats);
+        // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
+        float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
+        float mem_used = usage_stats.ru_maxrss / 1000;
+        cout << "rutime: " << runtime << ", mem used (in MB): " << mem_used << endl;
         // remove it from active q
         active_q_->remove(to_run);
         // write accounting into a file (like I did in the simulator)
         ofstream file;
         file.open("../procs_done.txt", ios::app);
-        file << time_since_start_() << ", " <<  id << ", " << to_run->get_type() << ", " << to_run->get_sla() << ", " << runtime << endl;
+        file << time_since_start_() << ", " <<  id << ", " << to_run->get_sla() << ", " << runtime << ", " << to_run->get_time_since_spawn(time_since_start_()) << endl;
         // update profile
         ProcTypeProfile* profile = get_profile(to_run->get_type());
         if (profile != nullptr) {
@@ -161,7 +128,6 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         } else {
             cout << "adding to holdq" << endl;
             hold_q_->enq(lb_msg.msg_proc);
-            cout << "added" << endl;
         }
     }
     
@@ -184,7 +150,7 @@ void Dispatcher::create_run_lb_conn_() {
     serv_addr.sin_port = htons(LB_MACHINE_LISTEN_PORT);
  
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, LB_IP, &serv_addr.sin_addr) <= 0) {
         perror("inet_pton");
         exit(EXIT_FAILURE);
     }
@@ -212,12 +178,12 @@ void Dispatcher::run_holdq_() {
     while (1) {
         for (Proc* p : hold_q_->get_q()) {
             if (((p->get_time_since_spawn(time_since_start_()) / p->get_sla()) > THRESHOLD_PUSH_TIME_PASSED_TO_SLA_RATIO)) {
-                cout << "pushing proc from holdq b/c it passed ratio" << endl;
+                cout << "pushing proc w/ sla " << p->get_sla() << " from holdq b/c it passed ratio" << endl;
                 hold_q_->remove(p);
                 std::thread t(&Dispatcher::add_run_active_proc_, this, p);
                 active_procs.push_back(std::move(t));
-            } else if ((active_q_->get_q().size() < 2)) {
-                cout << "pushing proc from holdq b/c active empty enough" << endl;
+            } else if ((active_q_->get_q().size() < THESHOLD_PUSH_ACTIVEQ_SIZE)) {
+                cout << "pushing proc w/ sla " << p->get_sla() << " from holdq b/c active empty enough" << endl;
                 hold_q_->remove(p);
                 std::thread t(&Dispatcher::add_run_active_proc_, this, p);
                 active_procs.push_back(std::move(t));

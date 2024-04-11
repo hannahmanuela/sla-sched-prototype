@@ -28,7 +28,7 @@ int Website::connect_to_lb_() {
     serv_addr.sin_port = htons(LB_CLIENT_LISTEN_PORT);
  
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, LB_IP, &serv_addr.sin_addr) <= 0) {
         perror("inet_pton");
         exit(EXIT_FAILURE);
     }
@@ -51,18 +51,18 @@ void Website::gen_load(int lb_conn_fd) {
         const char* executable;
         int sla;
         ProcType type;
-        if (i < NUM_STATIC_PROCS_GEN) {
-            executable = "/home/hannahmanuela/strawman-microbench/build/static_page_get";
-            sla = 5;
-            type = static_page_get; 
-        } else if (i < NUM_STATIC_PROCS_GEN + NUM_DYNAMIC_PROCS_GEN) {
+        if (i < NUM_DATA_FG_PROCS_GEN) {
+            executable = "/home/hannahmanuela/strawman-microbench/build/data_process_fg";
+            sla = 500;
+            type = data_process_fg; 
+        } else if (i < NUM_DATA_FG_PROCS_GEN + NUM_DYNAMIC_PROCS_GEN) {
             executable = "/home/hannahmanuela/strawman-microbench/build/dynamic_page_get";
             sla = 50;
             type = dynamic_page_get;
         } else {
-            executable = "/home/hannahmanuela/strawman-microbench/build/data_process_fg";
-            sla = 500;
-            type = data_process_fg;
+            executable = "/home/hannahmanuela/strawman-microbench/build/static_page_get";
+            sla = 5;
+            type = static_page_get;
         }
 
         // send "proc"
