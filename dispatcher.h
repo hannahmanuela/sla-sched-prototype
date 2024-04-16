@@ -8,6 +8,7 @@
 using namespace std;
 
 #include "queue.h"
+#include "proc_hist.h"
 
 #ifndef DISPATCHER_H
 #define DISPATCHER_H
@@ -70,8 +71,8 @@ class Dispatcher {
         void run_lb_conn_(int lb_conn_fd);
 
         void add_run_active_proc_(Proc* to_add);
-        void add_hold_proc_(Proc* to_add);
         void run_holdq_();
+        ProcHist gen_proc_hist_();
 
         int time_since_start_();
 

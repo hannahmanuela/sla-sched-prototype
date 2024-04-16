@@ -27,7 +27,6 @@ class Distribution {
     private:
         int count_;
     
-
 };
 
 #endif  // DISTRBUTION_H
@@ -35,7 +34,7 @@ class Distribution {
 #ifndef PROC_TYPE_PROFILE_H
 #define PROC_TYPE_PROFILE_H
 
-enum ProcType { static_page_get, dynamic_page_get, data_process_fg, data_process_bg };
+enum ProcType { STATIC_PAGE_GET, DYNAMIC_PAGE_GET, DATA_PROCESS_FG, DATA_PROCESS_BG };
 
 class ProcTypeProfile {
 

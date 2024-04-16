@@ -91,6 +91,19 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
     }
 }
 
+ProcHist Dispatcher::gen_proc_hist_() {
+    ProcHist hist = ProcHist();
+
+    for (Proc* p : active_q_->get_q()) {
+        hist.put(true, p->get_sla());
+    }
+    for (Proc* p : hold_q_->get_q()) {
+        hist.put(false, p->get_sla());
+    }
+
+    return hist;
+}
+
 void Dispatcher::run_lb_conn_(int lb_conn_fd) {
 
     vector<std::thread> procs;
@@ -108,26 +121,44 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
             cout << "lb died, we return" << endl;
             return;
         }
-        Message lb_msg = Message();
-        lb_msg.from_bytes(buffer);
-
-        if (lb_msg.is_exit) {
-            break;
-        }
+        MessageType msg_type;
+        std::memcpy(&msg_type, buffer, sizeof(MessageType));
         
-        cout << "got proc from lb: ";
-        lb_msg.msg_proc->print();
+        if (msg_type == EXIT) {
+            break;
+        } else if (msg_type == HEARTBEAT) {
+            // respond to heartbeat
+            ProcHist hist = gen_proc_hist_();
+            HeartbeatResponseMessage to_send = HeartbeatResponseMessage(hist);
 
-        lb_msg.msg_proc->set_time_spawned(time_since_start_());
+            char buffer[BUF_SZ];
+            to_send.to_bytes(buffer);
+            ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
+            if (n < 0) {
+                perror("ERROR sending to socket");
+            }
 
-        // add to hold q or active q? 
-        // should adding it to active q be what actually runs clone and exec?
-        if (lb_msg.msg_proc->get_sla() < THRESHOLD_PUSH_SLA) {
-            std::thread t(&Dispatcher::add_run_active_proc_, this, lb_msg.msg_proc);
-            procs.push_back(std::move(t));
+        } else if (msg_type == PROC) {
+            ProcMessage lb_proc_msg = ProcMessage();
+            lb_proc_msg.from_bytes(buffer);
+            
+            cout << "got proc from lb: ";
+            lb_proc_msg.msg_proc->print();
+
+            lb_proc_msg.msg_proc->set_time_spawned(time_since_start_());
+
+            // add to hold q or active q? 
+            // should adding it to active q be what actually runs clone and exec?
+            if (lb_proc_msg.msg_proc->get_sla() < THRESHOLD_PUSH_SLA) {
+                std::thread t(&Dispatcher::add_run_active_proc_, this, lb_proc_msg.msg_proc);
+                procs.push_back(std::move(t));
+            } else {
+                cout << "adding to holdq" << endl;
+                hold_q_->enq(lb_proc_msg.msg_proc);
+            }
         } else {
-            cout << "adding to holdq" << endl;
-            hold_q_->enq(lb_msg.msg_proc);
+            cout << "unexpected msg type on dispatcher" << endl;
+            break;
         }
     }
     

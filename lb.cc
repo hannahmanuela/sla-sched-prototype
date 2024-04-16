@@ -117,30 +117,84 @@ void LB::handle_client_conn_(int client_conn_fd) {
             cout << "client died";
             return;
         }
-        Message client_msg = Message();
-        client_msg.from_bytes(read_buffer);
+        MessageType msg_type;
+        std::memcpy(&msg_type, read_buffer, sizeof(MessageType));
 
-        if (client_msg.is_exit) {
+        if (msg_type == EXIT) {
             cout << "client closed conn" << endl;
             return;
+        } else if (msg_type != PROC) {
+            cout << "why is client sending not exit or proc msg?" << endl;
+            return;
         }
+        ProcMessage client_proc_msg = ProcMessage();
+        client_proc_msg.from_bytes(read_buffer);
 
         cout << "got proc from client: ";
-        client_msg.msg_proc->print();
+        client_proc_msg.msg_proc->print();
 
-        // TODO: pick a machine to send it to
-        // for now just sending to first one
+        // pick a machine to send it to
         if (machines_.size() < 1) {
             cout << "oops no machine, dropping for now" << endl;
             continue;
         }
+        int machine_ind = 0;
+        if (client_proc_msg.msg_proc->get_sla() < THRESHOLD_SPRAY_SLA) {
+            machine_ind = (std::rand() % machines_.size());
+        } else {
+            // look through machines info
+        }
         machine_list_lock_.lock();
-        Machine* machine_to_use = machines_[0];
+        Machine* machine_to_use = machines_[machine_ind];
         machine_list_lock_.unlock();
 
-        machine_to_use->send_message(Message(-1, false, client_msg.msg_proc));
+        machine_to_use->send_message(client_proc_msg);
     }
     
+}
+
+void wait_on_heartbeat(Machine* m) {
+
+    while (1) {
+        char read_buffer[BUF_SZ];
+        int n = read(m->conn_fd, read_buffer, BUF_SZ);
+        if (n < 0) {
+            perror("ERROR reading from socket");
+        } else if (n == 0) {
+            cout << "client died";
+            return;
+        }
+        MessageType msg_type;
+        std::memcpy(&msg_type, read_buffer, sizeof(MessageType));
+
+        if (msg_type != HEARTBEAT_RESPONSE) {
+            cout << "response to heartbeat wasn't a heartbeat reponse?" << endl;
+            return;
+        } else {
+            HeartbeatResponseMessage resp = HeartbeatResponseMessage();
+            resp.from_bytes(read_buffer);
+            m->curr_hist = resp.hist;
+        }
+
+    }
+}
+
+void LB::heartbeat_machines_() {
+
+    HeartbeatMessage heartbeat = HeartbeatMessage();
+    std::vector<std::thread> active_heartbeats;
+
+    while (1) {
+        for (Machine* m : get_machines_()) {
+            // ping machine
+            m->send_message(heartbeat);
+            // have a thread wait until time is up or have response; update machine info locally
+            std::thread h(wait_on_heartbeat, m);
+            active_heartbeats.push_back(std::move(h));
+        }
+        std::this_thread::sleep_for(chrono::milliseconds(MACHINE_HEARTBEAT_SLEEP_TIME_MILLISEC));
+    }
+
 }
 
 void LB::run() {
@@ -156,6 +210,7 @@ void LB::run() {
 
     std::thread machine_thread(&LB::listen_and_accept_machines_, this);
     std::thread client_thread(&LB::listen_and_accept_clients_, this);
+    std::thread heartbeat_machines(&LB::heartbeat_machines_, this);
 
     client_thread.join();
 }

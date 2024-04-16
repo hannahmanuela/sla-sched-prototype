@@ -11,10 +11,10 @@
 #include <fstream>
 using namespace std;
 
-#include "website.h"
-#include "proc.h"
-#include "consts.h"
-#include "message.h"
+#include "website-client.h"
+#include "../proc.h"
+#include "../consts.h"
+#include "../message.h"
 
 int Website::connect_to_lb_() {
     int status, lb_conn_fd;
@@ -54,22 +54,22 @@ void Website::gen_load(int lb_conn_fd) {
         if (i < NUM_DATA_FG_PROCS_GEN) {
             executable = "/home/hannahmanuela/strawman-microbench/build/data_process_fg";
             sla = 500;
-            type = data_process_fg; 
+            type = DATA_PROCESS_FG; 
         } else if (i < NUM_DATA_FG_PROCS_GEN + NUM_DYNAMIC_PROCS_GEN) {
             executable = "/home/hannahmanuela/strawman-microbench/build/dynamic_page_get";
             sla = 50;
-            type = dynamic_page_get;
+            type = DYNAMIC_PAGE_GET;
         } else {
             executable = "/home/hannahmanuela/strawman-microbench/build/static_page_get";
             sla = 5;
-            type = static_page_get;
+            type = STATIC_PAGE_GET;
         }
 
         // send "proc"
         vector<const char*> command;
         command.push_back(executable);
         Proc* proc = new Proc(sla, command, type);
-        Message to_send = Message(-1, false, proc);
+        ProcMessage to_send = ProcMessage(proc);
         char buffer[BUF_SZ];
         to_send.to_bytes(buffer);
 
@@ -83,7 +83,7 @@ void Website::gen_load(int lb_conn_fd) {
 
     // send exit message
     cout << "sending exit!" << endl;
-    Message to_send = Message(5, true, new Proc());
+    ExitMessage to_send = ExitMessage();
     char buffer[BUF_SZ];
     to_send.to_bytes(buffer);
     ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
