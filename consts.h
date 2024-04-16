@@ -1,5 +1,5 @@
 #define LB_MACHINE_LISTEN_PORT 8080
-#define LB_IP "127.0.0.1"
+#define LB_IP "18.26.5.3"
 #define LB_CLIENT_LISTEN_PORT 9000
 
 #define BUF_SZ 1024

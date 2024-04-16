@@ -16,6 +16,7 @@ class Machine {
         int mid;
         int conn_fd;
         ProcHist curr_hist;
+        int mem_free; // in what unit?
 
         Machine(int id, int fd) {
             mid = id;

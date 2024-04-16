@@ -114,7 +114,7 @@ void LB::handle_client_conn_(int client_conn_fd) {
         if (n < 0) {
             perror("ERROR reading from socket");
         } else if (n == 0) {
-            cout << "client died";
+            cout << "client died" << endl;
             return;
         }
         MessageType msg_type;
@@ -138,17 +138,40 @@ void LB::handle_client_conn_(int client_conn_fd) {
             cout << "oops no machine, dropping for now" << endl;
             continue;
         }
+        machine_list_lock_.lock();
         int machine_ind = 0;
         if (client_proc_msg.msg_proc->get_sla() < THRESHOLD_SPRAY_SLA) {
             machine_ind = (std::rand() % machines_.size());
         } else {
-            // look through machines info
+            // TODO: right now we are IGNORING memory :/ 
+            // find minimum number of procs in bucket across all machines that we know about
+            int min_procs_in_ind = INT32_MAX;
+            for (Machine* m : machines_) {
+                tuple<int, int> m_vals = m->curr_hist.get(client_proc_msg.msg_proc->get_sla());
+                int sum = get<0>(m_vals) + get<1>(m_vals);
+                if (sum < min_procs_in_ind) {
+                    min_procs_in_ind = sum;
+                }
+            }
+            cout << "min procs in ind: " << min_procs_in_ind << endl;
+            // if there are multiple machines with that value, pick the one with the least number of overall procs
+            int min_procs_total = INT32_MAX;
+            int index = 0;
+            for (Machine* m : machines_) {
+                tuple<int, int> m_vals = m->curr_hist.get(client_proc_msg.msg_proc->get_sla());
+                int sum = get<0>(m_vals) + get<1>(m_vals);
+                if ((sum == min_procs_in_ind) && sum < min_procs_total)  {
+                    cout << "using machine " << index << ", because of its small small sum " << sum << endl;
+                    machine_ind = index;
+                }
+                index += 1;
+            }
         }
-        machine_list_lock_.lock();
+        cout << "machine to use: " << machine_ind << endl;
         Machine* machine_to_use = machines_[machine_ind];
-        machine_list_lock_.unlock();
 
         machine_to_use->send_message(client_proc_msg);
+        machine_list_lock_.unlock();
     }
     
 }
@@ -161,7 +184,6 @@ void wait_on_heartbeat(Machine* m) {
         if (n < 0) {
             perror("ERROR reading from socket");
         } else if (n == 0) {
-            cout << "client died";
             return;
         }
         MessageType msg_type;

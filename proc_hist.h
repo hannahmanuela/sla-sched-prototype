@@ -15,10 +15,10 @@ class ProcHist {
         // map of sla range bottom to tuple< num active procs, num procs in holdq>
         std::map<int, std::tuple<int, int>> hist;
 
-        std::tuple<bool, int> get(int sla) {
+        std::tuple<int, int> get(int sla) {
             int index = map_sla_to_bottom(sla);
             if (hist.count(index) > 0) {
-                return std::make_tuple(false, -1);
+                return std::make_tuple(0, 0);
             } else {
                 return hist[index];
             }

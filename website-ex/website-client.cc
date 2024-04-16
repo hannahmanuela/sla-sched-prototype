@@ -9,6 +9,9 @@
 #include <signal.h>
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <thread>
+
 using namespace std;
 
 #include "website-client.h"
@@ -52,15 +55,15 @@ void Website::gen_load(int lb_conn_fd) {
         int sla;
         ProcType type;
         if (i < NUM_DATA_FG_PROCS_GEN) {
-            executable = "/home/hannahmanuela/strawman-microbench/build/data_process_fg";
+            executable = "/home/hannahmanuela/lnx-test/build/data_process_fg";
             sla = 500;
             type = DATA_PROCESS_FG; 
         } else if (i < NUM_DATA_FG_PROCS_GEN + NUM_DYNAMIC_PROCS_GEN) {
-            executable = "/home/hannahmanuela/strawman-microbench/build/dynamic_page_get";
+            executable = "/home/hannahmanuela/lnx-test/build/dynamic_page_get";
             sla = 50;
             type = DYNAMIC_PAGE_GET;
         } else {
-            executable = "/home/hannahmanuela/strawman-microbench/build/static_page_get";
+            executable = "/home/hannahmanuela/lnx-test/build/static_page_get";
             sla = 5;
             type = STATIC_PAGE_GET;
         }
@@ -80,17 +83,6 @@ void Website::gen_load(int lb_conn_fd) {
         cout << "sent " << n << " bytes" << endl;
         // TODO: delete alloced stuff?
     }
-
-    // send exit message
-    cout << "sending exit!" << endl;
-    ExitMessage to_send = ExitMessage();
-    char buffer[BUF_SZ];
-    to_send.to_bytes(buffer);
-    ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
-    if (n < 0) {
-        perror("ERROR sending to socket");
-    }
-    cout << "sent " << n << " bytes" << endl;
 }
 
 void Website::run() {
@@ -108,6 +100,19 @@ void Website::run() {
     sleep(1);
 
     gen_load(lb_conn_fd);
+    this_thread::sleep_for(chrono::milliseconds(500));
+    gen_load(lb_conn_fd);
+
+    // send exit message
+    cout << "sending exit!" << endl;
+    ExitMessage to_send = ExitMessage();
+    char buffer[BUF_SZ];
+    to_send.to_bytes(buffer);
+    ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
+    if (n < 0) {
+        perror("ERROR sending to socket");
+    }
+
     cout << "CLIENT EXITED" << endl;
 }
 
