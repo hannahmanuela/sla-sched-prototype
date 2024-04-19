@@ -6,7 +6,7 @@
 # sudo ./trace.sh -out "/home/hannahmanuela/traces" -capture_seconds 5 > /dev/null &
 
 # run
-cd ~/strawman-microbench/build
+cd ~/lnx-test/build
 
 # # start load balancer
 ./lb > /dev/null  &

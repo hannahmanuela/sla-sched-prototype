@@ -21,6 +21,31 @@ int Dispatcher::time_since_start_() {
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
 }
 
+tuple<string, string> get_time_(int pid) {
+   using std::ios_base;
+   using std::ifstream;
+   using std::string;
+
+   // 'file' stat seems to give the most reliable results
+   std::string file_name = "/proc/";
+   file_name += std::to_string(pid);
+   file_name += "/stat";
+   ifstream stat_stream(file_name ,ios_base::in);
+
+   // dummy vars for leading entries in stat that we don't care about
+   //
+   string pid_, comm, state, ppid, pgrp, session, tty_nr;
+   string tpgid, flags, minflt, cminflt, majflt, cmajflt;
+   string utime, stime;
+
+
+   stat_stream >> pid_ >> comm >> state >> ppid >> pgrp >> session >> tty_nr
+               >> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt
+               >> utime >> stime; // don't care about the rest
+
+   return make_tuple(utime, stime);
+}
+
 // runs in a thread
 // clones proc, adds it to active q, waits for it to finish, removes it from active q
 void Dispatcher::add_run_active_proc_(Proc* to_run) {
@@ -51,11 +76,26 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         active_q_->enq(to_run);
         // wait for proc to finish
         struct rusage usage_stats;
-        wait4(c_pid, NULL, 0, &usage_stats);
+        string final_utime = "init";
+        string final_stime = "init";
+        while (1) {
+            int ret = wait4(c_pid, NULL, WNOHANG, &usage_stats);
+            if (ret > 0) {
+                break;
+            } else {
+                // manually get time usage stats
+                tuple<string, string> ret_times = get_time_(c_pid);
+                final_utime = get<0>(ret_times);
+                final_stime = get<1>(ret_times);
+            }
+        }
+        cout << "final times: " << final_utime << ", " << final_stime << " - to be divided by " << sysconf(_SC_CLK_TCK) << endl;
         // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
-        float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
+        // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
+        float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
+                                + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
         float mem_used = usage_stats.ru_maxrss / 1000;
-        cout << "rutime: " << runtime << ", mem used (in MB): " << mem_used << endl;
+        cout << "rutime1: " << runtime << ", mem used (in MB): " << mem_used << endl;
         // remove it from active q
         active_q_->remove(to_run);
         // write accounting into a file (like I did in the simulator)
@@ -85,7 +125,7 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
             cout << "set affinity had an error" << endl;
         }
-        cout << "worker process: " << getpid() << endl;
+        cout << "worker process: " << getpid() << " for task with sla " << to_run->get_sla() << endl;
         // if child, execute intense compute
         to_run->exec_proc();
     }
@@ -141,9 +181,6 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         } else if (msg_type == PROC) {
             ProcMessage lb_proc_msg = ProcMessage();
             lb_proc_msg.from_bytes(buffer);
-            
-            cout << "got proc from lb: ";
-            lb_proc_msg.msg_proc->print();
 
             lb_proc_msg.msg_proc->set_time_spawned(time_since_start_());
 

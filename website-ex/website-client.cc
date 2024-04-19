@@ -83,6 +83,16 @@ void Website::gen_load(int lb_conn_fd) {
         cout << "sent " << n << " bytes" << endl;
         // TODO: delete alloced stuff?
     }
+    
+    // send exit message
+    cout << "sending exit!" << endl;
+    ExitMessage to_send = ExitMessage();
+    char buffer[BUF_SZ];
+    to_send.to_bytes(buffer);
+    ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
+    if (n < 0) {
+        perror("ERROR sending to socket");
+    }
 }
 
 void Website::run() {
@@ -100,18 +110,6 @@ void Website::run() {
     sleep(1);
 
     gen_load(lb_conn_fd);
-    this_thread::sleep_for(chrono::milliseconds(500));
-    gen_load(lb_conn_fd);
-
-    // send exit message
-    cout << "sending exit!" << endl;
-    ExitMessage to_send = ExitMessage();
-    char buffer[BUF_SZ];
-    to_send.to_bytes(buffer);
-    ssize_t n = send(lb_conn_fd, buffer, sizeof(buffer), 0);
-    if (n < 0) {
-        perror("ERROR sending to socket");
-    }
 
     cout << "CLIENT EXITED" << endl;
 }
