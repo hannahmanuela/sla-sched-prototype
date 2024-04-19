@@ -1,5 +1,5 @@
 #define LB_MACHINE_LISTEN_PORT 8080
-#define LB_IP "18.26.5.3"
+#define LB_IP "172.31.75.20"
 #define LB_CLIENT_LISTEN_PORT 9000
 
 #define BUF_SZ 1024
@@ -12,6 +12,10 @@
 #define NUM_STATIC_PROCS_GEN 2
 #define NUM_DYNAMIC_PROCS_GEN 2
 #define NUM_DATA_FG_PROCS_GEN 2
+
+#define STATIC_PATH "/home/arch/lnx-test/build/static_page_get"
+#define DYANMIC_PATH "/home/arch/lnx-test/build/dynamic_page_get"
+#define FG_PATH "/home/arch/lnx-test/build/data_process_fg"
 
 // for dispatcher
 #define CORE_DISPATCHER_RUNS_ON 0

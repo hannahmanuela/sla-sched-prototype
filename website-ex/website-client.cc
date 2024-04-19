@@ -55,15 +55,15 @@ void Website::gen_load(int lb_conn_fd) {
         int sla;
         ProcType type;
         if (i < NUM_DATA_FG_PROCS_GEN) {
-            executable = "/home/hannahmanuela/lnx-test/build/data_process_fg";
+            executable = FG_PATH;
             sla = 500;
             type = DATA_PROCESS_FG; 
         } else if (i < NUM_DATA_FG_PROCS_GEN + NUM_DYNAMIC_PROCS_GEN) {
-            executable = "/home/hannahmanuela/lnx-test/build/dynamic_page_get";
+            executable = DYANMIC_PATH;
             sla = 50;
             type = DYNAMIC_PAGE_GET;
         } else {
-            executable = "/home/hannahmanuela/lnx-test/build/static_page_get";
+            executable = STATIC_PATH;
             sla = 5;
             type = STATIC_PAGE_GET;
         }
