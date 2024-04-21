@@ -9,9 +9,9 @@
 #define CORE_LB_WEBSITE_RUN_ON 0
 
 // for client
-#define NUM_STATIC_PROCS_GEN 2
-#define NUM_DYNAMIC_PROCS_GEN 2
-#define NUM_DATA_FG_PROCS_GEN 2
+#define NUM_STATIC_PROCS_GEN 0
+#define NUM_DYNAMIC_PROCS_GEN 0
+#define NUM_DATA_FG_PROCS_GEN 1
 
 #define STATIC_PATH "/home/arch/lnx-test/build/static_page_get"
 #define DYANMIC_PATH "/home/arch/lnx-test/build/dynamic_page_get"
