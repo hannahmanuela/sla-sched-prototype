@@ -1,4 +1,4 @@
-#define USING_PD3 false
+#define USING_PD3 true
 
 #define LB_MACHINE_LISTEN_PORT 8080
 #if USING_PD3
@@ -19,9 +19,16 @@
 #define NUM_DYNAMIC_PROCS_GEN 0
 #define NUM_DATA_FG_PROCS_GEN 1
 
-#define STATIC_PATH "/home/arch/lnx-test/build/static_page_get"
-#define DYANMIC_PATH "/home/arch/lnx-test/build/dynamic_page_get"
-#define FG_PATH "/home/arch/lnx-test/build/data_process_fg"
+#if USING_PD3
+    #define STATIC_PATH "/home/hannahmanuela/lnx-test/build/static_page_get"
+    #define DYANMIC_PATH "/home/hannahmanuela/lnx-test/build/dynamic_page_get"
+    #define FG_PATH "/home/hannahmanuela/lnx-test/build/data_process_fg"
+#else 
+    #define STATIC_PATH "/home/arch/lnx-test/build/static_page_get"
+    #define DYANMIC_PATH "/home/arch/lnx-test/build/dynamic_page_get"
+    #define FG_PATH "/home/arch/lnx-test/build/data_process_fg"
+#endif
+
 
 // for dispatcher
 #define CORE_DISPATCHER_RUNS_ON 0
