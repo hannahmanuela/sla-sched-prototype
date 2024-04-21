@@ -1,5 +1,11 @@
+#define USING_PD3 false
+
 #define LB_MACHINE_LISTEN_PORT 8080
-#define LB_IP "172.31.75.20"
+#if USING_PD3
+    #define LB_IP "18.26.5.3"
+#else 
+    #define LB_IP "172.31.75.20"
+#endif
 #define LB_CLIENT_LISTEN_PORT 9000
 
 #define BUF_SZ 1024
