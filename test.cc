@@ -30,10 +30,8 @@ int main() {
             perror("wait4 did bad");
         }
         // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
-        // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
         float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
                                 + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
-        float mem_used = usage_stats.ru_maxrss / 1000;
 
         std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_time);
         int time_passed = 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
