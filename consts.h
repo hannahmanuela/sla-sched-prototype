@@ -1,10 +1,11 @@
-#define USING_PD3 true
+#define USING_PD3 false
+#define USING_CLOUDLAB true
 
 #define LB_MACHINE_LISTEN_PORT 8080
 #if USING_PD3
     #define LB_IP "18.26.5.3"
-#else 
-    #define LB_IP "172.31.75.20"
+#elif USING_CLOUDLAB
+    #define LB_IP "130.127.133.141"
 #endif
 #define LB_CLIENT_LISTEN_PORT 9000
 
@@ -23,10 +24,10 @@
     #define STATIC_PATH "/home/hannahmanuela/lnx-test/build/static_page_get"
     #define DYANMIC_PATH "/home/hannahmanuela/lnx-test/build/dynamic_page_get"
     #define FG_PATH "/home/hannahmanuela/lnx-test/build/data_process_fg"
-#else 
-    #define STATIC_PATH "/home/arch/lnx-test/build/static_page_get"
-    #define DYANMIC_PATH "/home/arch/lnx-test/build/dynamic_page_get"
-    #define FG_PATH "/home/arch/lnx-test/build/data_process_fg"
+#elif USING_CLOUDLAB
+    #define STATIC_PATH "/users/hmng/lnx-test/build/static_page_get"
+    #define DYANMIC_PATH "/users/hmng/lnx-test/build/dynamic_page_get"
+    #define FG_PATH "/users/hmng/lnx-test/build/data_process_fg"
 #endif
 
 

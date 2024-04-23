@@ -3,6 +3,9 @@
 
 cd /sys/fs/cgroup
 
+echo "+cpu" | sudo tee cgroup.subtree_control
+echo "+cpuset" | sudo tee cgroup.subtree_control
+
 sudo mkdir one-digit-ms
 echo 10000 | sudo tee one-digit-ms/cpu.weight
 
