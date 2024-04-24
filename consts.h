@@ -10,15 +10,15 @@
 #define LB_CLIENT_LISTEN_PORT 9000
 
 #define BUF_SZ 1024
-#define TOTAL_NUM_CPUS 4
+#define TOTAL_NUM_CPUS 2
 
 // for single machine setup
 #define CORE_LB_WEBSITE_RUN_ON 0
 
 // for client
-#define NUM_STATIC_PROCS_GEN 0
-#define NUM_DYNAMIC_PROCS_GEN 0
-#define NUM_DATA_FG_PROCS_GEN 1
+#define NUM_STATIC_PROCS_GEN 2
+#define NUM_DYNAMIC_PROCS_GEN 2
+#define NUM_DATA_FG_PROCS_GEN 2
 
 #if USING_PD3
     #define STATIC_PATH "/home/hannahmanuela/lnx-test/build/static_page_get"

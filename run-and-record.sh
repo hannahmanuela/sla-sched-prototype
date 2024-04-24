@@ -2,34 +2,32 @@
 
 # start recording
 
-# cd ~/schedviz/util
-# sudo ./trace.sh -out "/home/hannahmanuela/traces" -capture_seconds 5 > /dev/null &
+cd ~/schedviz/util
+sudo ./trace.sh -out "/users/hmng/traces" -capture_seconds 5 > /dev/null &
 
 # run
 cd ~/lnx-test/build
 
 # # start load balancer
-./lb > /dev/null  &
+./lb > /dev/null &
 pid_lb=$!
 echo $pid_lb
-sleep 1
+sleep 0.2
 
 # # start dispatcher
-sudo ./dispatcher &
+sudo ./dispatcher > /dev/null &
 pid_dispatcher=$!
 echo $pid_dispatcher
 
-sleep 1
+sleep 0.2
 
-# # start client
-./website > /dev/null &
+# start client
+./website-client > /dev/null &
 
 
-# # # kill them all
+#wait for it to run, then kill them all
 sleep 4
-# kill -9 $pid_lb
-# sleep 1
-# kill -9 $pid_dispatcher
+kill -9 $pid_lb
 
 
 
