@@ -26,7 +26,7 @@ class Dispatcher {
             hold_q_ = new Queue();
 
             // open cgroup files
-            fd_one_digit_ms_cgroup_ = open("/sys/fs/cgroup/three-digit-ms", O_RDONLY); // given cpu.weight 10000
+            fd_one_digit_ms_cgroup_ = open("/sys/fs/cgroup/one-digit-ms", O_RDONLY); // given cpu.weight 10000
             if(fd_one_digit_ms_cgroup_ == -1) {
                 cout << "open failed: " << strerror(errno) << endl;
             }
@@ -34,7 +34,7 @@ class Dispatcher {
             if(fd_two_digit_ms_cgroup_ == -1) {
                 cout << "open failed: " << strerror(errno) << endl;
             }
-            fd_three_digit_ms_cgroup_ = open("/sys/fs/cgroup/one-digit-ms", O_RDONLY); // given cpu.weight 1
+            fd_three_digit_ms_cgroup_ = open("/sys/fs/cgroup/three-digit-ms", O_RDONLY); // given cpu.weight 1
             if(fd_three_digit_ms_cgroup_ == -1) {
                 cout << "open failed: " << strerror(errno) << endl;
             }
