@@ -50,8 +50,6 @@ tuple<string, string> get_time_(int pid) {
 // clones proc, adds it to active q, waits for it to finish, removes it from active q
 void Dispatcher::add_run_active_proc_(Proc* to_run) {
 
-    to_run->set_time_spawned(time_since_start_());
-
     // clone
     int fd_to_use;
     if (to_run->get_sla() < 10) {
@@ -110,7 +108,8 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         // setting affinity manually for now - use all cores not used by the lb/website or dispatcher
         cpu_set_t mask;
         CPU_ZERO(&mask);
-        for (int i = 0; i < TOTAL_NUM_CPUS; i++) {
+        // don't use core 0
+        for (int i = 1; i < TOTAL_NUM_CPUS; i++) {
             if (i != CORE_DISPATCHER_RUNS_ON && i != CORE_LB_WEBSITE_RUN_ON) {
                 CPU_SET(i, &mask);
             }
@@ -173,6 +172,8 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         } else if (msg_type == PROC) {
             ProcMessage lb_proc_msg = ProcMessage();
             lb_proc_msg.from_bytes(buffer);
+
+            lb_proc_msg.msg_proc->set_time_spawned(time_since_start_());
 
             // add to hold q or active q? 
             // should adding it to active q be what actually runs clone and exec?
