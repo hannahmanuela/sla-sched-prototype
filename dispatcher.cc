@@ -2,19 +2,39 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
-#include <unistd.h>
 #include <syscall.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <thread>
 #include <fstream>
+// #include <linux/sched/types.h>
 
 #include "dispatcher.h"
 #include "message.h"
 #include "consts.h"
+
+// can also include #include <linux/sched/types.h>, but then we get known include errors with sched_param being double defined
+struct sched_attr {
+    uint32_t size;
+
+    uint32_t sched_policy;
+    uint64_t sched_flags;
+
+    /* SCHED_NORMAL, SCHED_BATCH */
+    int32_t sched_nice;
+
+    /* SCHED_FIFO, SCHED_RR */
+    uint32_t sched_priority;
+
+    /* SCHED_DEADLINE (nsec) */
+    uint64_t sched_runtime;
+    uint64_t sched_deadline;
+    uint64_t sched_period;
+};
+
+#define NSEC_PER_MSEC 1000000
 
 int Dispatcher::time_since_start_() {
     std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_time_);
@@ -50,28 +70,11 @@ tuple<string, string> get_time_(int pid) {
 // clones proc, adds it to active q, waits for it to finish, removes it from active q
 void Dispatcher::add_run_active_proc_(Proc* to_run) {
 
-    to_run->set_time_spawned(time_since_start_());
-
-    // clone
-    int fd_to_use;
-    if (to_run->get_sla() < 10) {
-        fd_to_use = fd_one_digit_ms_cgroup_;
-    } else if (to_run->get_sla() < 100) {
-        fd_to_use = fd_two_digit_ms_cgroup_;
-    } else {
-        fd_to_use = fd_three_digit_ms_cgroup_;
-    }
-
-    struct clone_args args = {
-        .flags = CLONE_INTO_CGROUP,
-        .exit_signal = SIGCHLD,
-        .cgroup = (__u64)fd_to_use,
-        };
-    int c_pid = syscall(SYS_clone3, &args, sizeof(struct clone_args));
+    int c_pid = fork();
 
     if (c_pid == -1) { 
-        cout << "clone3 failed: " << strerror(errno) << endl;
-        perror("clone3"); 
+        cout << "fork failed: " << strerror(errno) << endl;
+        perror("fork"); 
         exit(EXIT_FAILURE); 
     } else if (c_pid > 0) { 
         // PARENT
@@ -107,10 +110,20 @@ void Dispatcher::add_run_active_proc_(Proc* to_run) {
         // free the procs mem? I think this just calls the desctructor?
         free(to_run);
     } else {
+
+        struct sched_attr attr;
+        syscall(SYS_sched_getattr, getpid(), &attr, 0);
+        attr.sched_runtime = to_run->get_sla() * NSEC_PER_MSEC;
+        int ret = syscall(SYS_sched_setattr, getpid(), &attr, 0);
+        if (ret < 0) {
+            perror("sched_setattr");
+        }
+        cout << "set sched_runtime to be " << to_run->get_sla() * NSEC_PER_MSEC << endl;
+
         // setting affinity manually for now - use all cores not used by the lb/website or dispatcher
         cpu_set_t mask;
         CPU_ZERO(&mask);
-        for (int i = 0; i < TOTAL_NUM_CPUS; i++) {
+        for (int i = 1; i < TOTAL_NUM_CPUS; i++) {
             if (i != CORE_DISPATCHER_RUNS_ON && i != CORE_LB_WEBSITE_RUN_ON) {
                 CPU_SET(i, &mask);
             }
@@ -173,6 +186,8 @@ void Dispatcher::run_lb_conn_(int lb_conn_fd) {
         } else if (msg_type == PROC) {
             ProcMessage lb_proc_msg = ProcMessage();
             lb_proc_msg.from_bytes(buffer);
+
+            lb_proc_msg.msg_proc->set_time_spawned(time_since_start_());
 
             // add to hold q or active q? 
             // should adding it to active q be what actually runs clone and exec?

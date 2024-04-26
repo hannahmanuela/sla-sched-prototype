@@ -1,8 +1,6 @@
 #include <string.h>
 #include <iostream>
 #include <fcntl.h>
-#include <linux/sched.h>
-#include <sched.h>
 #include <chrono>
 #include <ctime>
 using namespace std;
@@ -24,22 +22,6 @@ class Dispatcher {
             proc_type_profiles_ = proc_type_profiles;
             active_q_ = new Queue();
             hold_q_ = new Queue();
-
-            // open cgroup files
-            fd_one_digit_ms_cgroup_ = open("/sys/fs/cgroup/one-digit-ms", O_RDONLY); // given cpu.weight 10000
-            if(fd_one_digit_ms_cgroup_ == -1) {
-                cout << "open failed: " << strerror(errno) << endl;
-            }
-            fd_two_digit_ms_cgroup_ = open("/sys/fs/cgroup/two-digit-ms", O_RDONLY); // given cpu.weight 100
-            if(fd_two_digit_ms_cgroup_ == -1) {
-                cout << "open failed: " << strerror(errno) << endl;
-            }
-            fd_three_digit_ms_cgroup_ = open("/sys/fs/cgroup/three-digit-ms", O_RDONLY); // given cpu.weight 1
-            if(fd_three_digit_ms_cgroup_ == -1) {
-                cout << "open failed: " << strerror(errno) << endl;
-            }
-
-            cout << "inited fds: " << fd_one_digit_ms_cgroup_ << ", " << fd_two_digit_ms_cgroup_ << ", " << fd_three_digit_ms_cgroup_ << endl;
         };
 
         ProcTypeProfile* get_profile (ProcType type) { 

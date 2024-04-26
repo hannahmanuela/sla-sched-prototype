@@ -10,11 +10,12 @@
 #define LB_CLIENT_LISTEN_PORT 9000
 
 #define BUF_SZ 1024
-// TOTAL_NUM_CPUS -1 is how many cpus the dispatcher gets to run stuff
-#define TOTAL_NUM_CPUS 2
+// TOTAL_NUM_CPUS - 2 is how many cpus the dispatcher gets to run stuff
+// we are avoiding core 0 for now
+#define TOTAL_NUM_CPUS 3
 
 // for single machine setup
-#define CORE_LB_WEBSITE_RUN_ON 0
+#define CORE_LB_WEBSITE_RUN_ON 1
 
 // for client
 #define NUM_STATIC_PROCS_GEN 1
@@ -33,7 +34,7 @@
 
 
 // for dispatcher
-#define CORE_DISPATCHER_RUNS_ON 0
+#define CORE_DISPATCHER_RUNS_ON 1
 #define THRESHOLD_PUSH_SLA 10
 #define THESHOLD_PUSH_ACTIVEQ_SIZE 2
 #define THRESHOLD_PUSH_TIME_PASSED_TO_SLA_RATIO 0.3
