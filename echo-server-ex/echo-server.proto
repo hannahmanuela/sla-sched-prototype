@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package echoserver;
+
+service EchoServer {
+
+    rpc Echo(HelloRequest) returns (HelloReply) {}
+
+}
+
+message HelloRequest {
+  string name = 1;
+}
+
+message HelloReply {
+  string message = 1;
+}
