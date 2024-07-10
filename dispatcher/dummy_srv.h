@@ -48,9 +48,9 @@ class DummyServerImp final {
     cout << "Server listening on " << DISPATCHER_ADDR << endl;
 
     // TODO: how would I pick a cq for a given rpc?
-    std::thread thread1(HandleRpcsHelper, 1, this);
-    std::thread thread2(HandleRpcsHelper, 2, this);
-    std::thread thread3(HandleRpcsHelper, 3, this);
+    std::thread thread1(&DummyServerImp::HandleRpcs, this, 1);
+    std::thread thread2(&DummyServerImp::HandleRpcs, this, 2);
+    std::thread thread3(&DummyServerImp::HandleRpcs, this, 3);
 
     thread1.join();
     thread2.join();
@@ -97,6 +97,14 @@ class DummyServerImp final {
 
         // The actual processing.
         std::string prefix("Hello ");
+        int to_factor = 99995349;
+        std::vector<int> factors;
+
+        for (int i = 1; i <= to_factor; i++) {
+            if (to_factor % i == 0) {
+                factors.push_back(i);
+            }
+        }
         reply_.set_answer(prefix + request_.param1());
         
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -141,11 +149,6 @@ class DummyServerImp final {
     CallStatus status_;  // The current serving state.
   };
 
-  static void HandleRpcsHelper(int id, DummyServerImp *server)
-  {
-    std::cout<< "ID:" << id << std::endl;
-    server->HandleRpcs(id);
-  }
   // This can be run in multiple threads if needed.
   void HandleRpcs(int id) {
     // Spawn a new CallData instance to serve new clients.
@@ -158,9 +161,10 @@ class DummyServerImp final {
       // memory address of a CallData instance.
       // The return value of Next should always be checked. This return value
       // tells us whether there is any kind of event or cq_ is shutting down.
-      std::cout << "waiting... " << id << std::endl;
+      // TODO: can use the tag to host different services? (here: https://groups.google.com/g/grpc-io/c/bXMmfah57h4/m/EUg2B8o1AgAJ)
+      cout << id << " in thread " << gettid() << endl;
       if (cq_->Next(&tag, &ok) && ok) {
-        std::cout << "wakeup... " <<  id <<std::endl;
+        cout << "wakeup... " <<  id << endl;
         static_cast<CallData*>(tag)->Proceed();
       } else {
         cout << "closing b/c returned false" << endl;

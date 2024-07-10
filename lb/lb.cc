@@ -20,14 +20,26 @@ using namespace std;
 #include "dummy_clnt.h"
 
 
+void doTheThing(std::string inp, DummyClient* clnt) {
+        std::string reply = clnt->DoStuff(inp); 
+        std::cout << "resp received: " << reply << std::endl;  
+}
+
 void LB::runDummyEx() {
 
     DummyClient clnt(grpc::CreateChannel(DISPATCHER_ADDR, grpc::InsecureChannelCredentials()));
 
+    std::vector<std::thread> threads;
+    
     for (int i = 0; i < 10; i++) {
         std::string inp = std::to_string(i);
-        std::string reply = clnt.DoStuff(inp); 
-        std::cout << "resp received: " << reply << std::endl;
+        // doTheThing(inp, &clnt);
+        std::thread t(doTheThing, inp, &clnt);
+        threads.push_back(std::move(t));
+    }
+
+    for (std::thread& t : threads) {
+        t.join();
     }
 
 }
