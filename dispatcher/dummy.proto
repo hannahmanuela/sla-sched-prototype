@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package dummyserver;
+
+service DummyServer {
+
+    rpc DoStuff(DummyRequest) returns (DummyReply) {}
+
+}
+
+message DummyRequest {
+  string param1 = 1;
+}
+
+message DummyReply {
+  string answer = 1;
+}
