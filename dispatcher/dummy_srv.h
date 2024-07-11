@@ -2,6 +2,8 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 
 #include <grpcpp/grpcpp.h>
@@ -47,15 +49,7 @@ class DummyServerImp final {
     server_ = builder.BuildAndStart();
     cout << "Server listening on " << DISPATCHER_ADDR << endl;
 
-    // TODO: how would I pick a cq for a given rpc?
-    std::thread thread1(&DummyServerImp::HandleRpcs, this, 1);
-    std::thread thread2(&DummyServerImp::HandleRpcs, this, 2);
-    std::thread thread3(&DummyServerImp::HandleRpcs, this, 3);
-
-    thread1.join();
-    thread2.join();
-    thread3.join();
-
+    HandleRpcs();
   }
 
  private:
@@ -73,11 +67,10 @@ class DummyServerImp final {
 
     void Proceed() {
       if (status_ == CREATE) {
-        // Make this instance progress to the PROCESS state.
         status_ = PROCESS;
 
         // TODO: start a timer here?
-        // TODO: reusing threads might be a problem, given lag/eligibility calculations...
+        //  reusing threads might be a problem, given lag/eligibility calculations...
         // could just start a thread in here if we wanted to? how would that work?
 
         // As part of the initial CREATE state, we *request* that the system
@@ -85,15 +78,16 @@ class DummyServerImp final {
         // the tag uniquely identifying the request (so that different CallData
         // instances can serve different requests concurrently), in this case
         // the memory address of this CallData instance.
-        // TODO: would this be where I set the threads slice?
         service_->RequestDoStuff(&ctx_, &request_, &responder_, cq_, cq_,
                                   this);
       } else if (status_ == PROCESS) {
         // Spawn a new CallData instance to serve new clients while we process
         // the one for this CallData. The instance will deallocate itself as
         // part of its FINISH state.
-         // TODO: would this be where I set the threads slice?
+        // TODO: why?
         new CallData(service_, cq_);
+
+        cout << "running in thread " << gettid() << endl;
 
         // The actual processing.
         std::string prefix("Hello ");
@@ -149,12 +143,12 @@ class DummyServerImp final {
     CallStatus status_;  // The current serving state.
   };
 
-  // This can be run in multiple threads if needed.
-  void HandleRpcs(int id) {
+  void HandleRpcs() {
     // Spawn a new CallData instance to serve new clients.
     new CallData(&service_, cq_.get());
     void* tag;  // uniquely identifies a request.
     bool ok;
+    std::vector<std::thread> threads;
     while (true) {
       // Block waiting to read the next event from the completion queue. The
       // event is uniquely identified by its tag, which in this case is the
@@ -162,15 +156,65 @@ class DummyServerImp final {
       // The return value of Next should always be checked. This return value
       // tells us whether there is any kind of event or cq_ is shutting down.
       // TODO: can use the tag to host different services? (here: https://groups.google.com/g/grpc-io/c/bXMmfah57h4/m/EUg2B8o1AgAJ)
-      cout << id << " in thread " << gettid() << endl;
       if (cq_->Next(&tag, &ok) && ok) {
-        cout << "wakeup... " <<  id << endl;
-        static_cast<CallData*>(tag)->Proceed();
+        // run this in a new thread
+        cout << "got something!" << endl;
+        CallData* curr = static_cast<CallData*>(tag);
+        std::thread t(&DummyServerImp::RunAndGatherData, this, curr);
+        threads.push_back(std::move(t));
       } else {
         cout << "closing b/c returned false" << endl;
-        return;
+        break;
       }      
     }
+    for (std::thread& t : threads) {
+      t.join();
+    }
+  }
+
+  void RunAndGatherData(CallData* toRun) {
+    
+
+    std::mutex m;
+    std::condition_variable cond;
+
+    pid_t* worker_tid = nullptr; 
+    std::unique_lock<std::mutex> lk{m};
+    cout << "getting tid" << endl;
+    std::thread t = runWrapper(toRun, &m, &cond, worker_tid);
+    while (worker_tid == nullptr) { // Wait inside loop to handle spurious wakeups etc.
+        cond.wait(lk);
+    }
+    cout << "got tid" << endl;
+    
+    struct rusage usage_stats;
+    cout << "waiting..." << endl;
+    int ret = wait4(*worker_tid, NULL, 0, &usage_stats);
+    if (ret < 0) {
+        perror("wait4 did bad");
+    }
+    // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
+    // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
+    float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
+                            + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
+    float mem_used = usage_stats.ru_maxrss / 1000;
+    cout << "pid " << *worker_tid << ", with runtime: " << runtime << ", mem used (in MB): " << mem_used << endl;  
+
+  }
+
+  std::thread runWrapper(CallData* toRun, std::mutex* m, std::condition_variable* cond, pid_t* tid) {
+
+    { 
+      std::lock_guard<std::mutex> lk{*m};
+      cout << "setting tid" << endl;
+      *tid = gettid();
+      (*cond).notify_all();
+    }
+
+    std::thread t(&CallData::Proceed, toRun);
+
+    return std::move(t);
+
   }
 
   std::unique_ptr<ServerCompletionQueue> cq_;

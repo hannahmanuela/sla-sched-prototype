@@ -31,7 +31,7 @@ void LB::runDummyEx() {
 
     std::vector<std::thread> threads;
     
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 2; i++) {
         std::string inp = std::to_string(i);
         // doTheThing(inp, &clnt);
         std::thread t(doTheThing, inp, &clnt);
