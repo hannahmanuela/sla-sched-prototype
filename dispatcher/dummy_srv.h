@@ -173,16 +173,13 @@ class DummyServerImp final {
   }
 
   void RunAndGatherData(CallData* toRun) {
-    
 
-    std::mutex m;
-    std::condition_variable cond;
-
-    pid_t* worker_tid = nullptr; 
+    pid_t* worker_tid = new int(-1); 
     std::unique_lock<std::mutex> lk{m};
     cout << "getting tid" << endl;
-    std::thread t = runWrapper(toRun, &m, &cond, worker_tid);
-    while (worker_tid == nullptr) { // Wait inside loop to handle spurious wakeups etc.
+    std::thread t(&DummyServerImp::runWrapper, this, toRun, worker_tid);
+    cout << "about to wait " << *worker_tid << endl;
+    while ((*worker_tid) == -1) { // Wait inside loop to handle spurious wakeups etc.
         cond.wait(lk);
     }
     cout << "got tid" << endl;
@@ -202,20 +199,21 @@ class DummyServerImp final {
 
   }
 
-  std::thread runWrapper(CallData* toRun, std::mutex* m, std::condition_variable* cond, pid_t* tid) {
+  void runWrapper(CallData* toRun, pid_t* tid) {
 
     { 
-      std::lock_guard<std::mutex> lk{*m};
+      std::lock_guard<std::mutex> lk{m};
       cout << "setting tid" << endl;
       *tid = gettid();
-      (*cond).notify_all();
     }
+    cond.notify_all();
 
-    std::thread t(&CallData::Proceed, toRun);
-
-    return std::move(t);
+    toRun->Proceed();
 
   }
+
+  std::condition_variable cond;
+  std::mutex m;
 
   std::unique_ptr<ServerCompletionQueue> cq_;
   DummyServer::AsyncService service_;

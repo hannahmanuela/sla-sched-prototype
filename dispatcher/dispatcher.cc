@@ -10,7 +10,6 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <thread>
-#include <fstream>
 
 #include "dummy_srv.h"
 #include "consts.h"
