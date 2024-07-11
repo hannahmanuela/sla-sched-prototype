@@ -2,8 +2,7 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <sys/resource.h>
 
 
 #include <grpcpp/grpcpp.h>
@@ -69,7 +68,6 @@ class DummyServerImp final {
       if (status_ == CREATE) {
         status_ = PROCESS;
 
-        // TODO: start a timer here?
         //  reusing threads might be a problem, given lag/eligibility calculations...
         // could just start a thread in here if we wanted to? how would that work?
 
@@ -84,7 +82,6 @@ class DummyServerImp final {
         // Spawn a new CallData instance to serve new clients while we process
         // the one for this CallData. The instance will deallocate itself as
         // part of its FINISH state.
-        // TODO: why?
         new CallData(service_, cq_);
 
         cout << "running in thread " << gettid() << endl;
@@ -111,7 +108,6 @@ class DummyServerImp final {
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
         
-        // TODO: end timer here? how do I get resource usage?
       } else {
         CHECK_EQ(status_, FINISH);
         // Once in the FINISH state, deallocate ourselves (CallData).
@@ -174,46 +170,33 @@ class DummyServerImp final {
 
   void RunAndGatherData(CallData* toRun) {
 
-    pid_t* worker_tid = new int(-1); 
-    std::unique_lock<std::mutex> lk{m};
-    cout << "getting tid" << endl;
-    std::thread t(&DummyServerImp::runWrapper, this, toRun, worker_tid);
-    cout << "about to wait " << *worker_tid << endl;
-    while ((*worker_tid) == -1) { // Wait inside loop to handle spurious wakeups etc.
-        cond.wait(lk);
-    }
-    cout << "got tid" << endl;
-    
     struct rusage usage_stats;
-    cout << "waiting..." << endl;
-    int ret = wait4(*worker_tid, NULL, 0, &usage_stats);
-    if (ret < 0) {
-        perror("wait4 did bad");
-    }
+
+    std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
+    std::thread t(&DummyServerImp::runWrapper, this, toRun, &usage_stats);
+    t.join();
+    
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
     // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
     float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
                             + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
     float mem_used = usage_stats.ru_maxrss / 1000;
-    cout << "pid " << *worker_tid << ", with runtime: " << runtime << ", mem used (in MB): " << mem_used << endl;  
+    cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
 
   }
 
-  void runWrapper(CallData* toRun, pid_t* tid) {
-
-    { 
-      std::lock_guard<std::mutex> lk{m};
-      cout << "setting tid" << endl;
-      *tid = gettid();
-    }
-    cond.notify_all();
+  void runWrapper(CallData* toRun, struct rusage* usage_stats) {
 
     toRun->Proceed();
 
+    getrusage(RUSAGE_THREAD, usage_stats);
+
   }
 
-  std::condition_variable cond;
-  std::mutex m;
+  int time_since_(std::chrono::high_resolution_clock::time_point since) {
+    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - since);
+    return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
+  }
 
   std::unique_ptr<ServerCompletionQueue> cq_;
   DummyServer::AsyncService service_;
