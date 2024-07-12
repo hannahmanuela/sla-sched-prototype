@@ -84,8 +84,6 @@ class DummyServerImp final {
         // part of its FINISH state.
         new CallData(service_, cq_);
 
-        cout << "running in thread " << gettid() << endl;
-
         // The actual processing.
         std::string prefix("Hello ");
         long long sum = 0;
@@ -94,10 +92,6 @@ class DummyServerImp final {
         }
         reply_.set_answer(prefix + std::to_string(sum) + request_.param1());
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        cout << "processing in thread: " << gettid() << endl;
-
         // And we are done! Let the gRPC runtime know we've finished, using the
         // memory address of this instance as the uniquely identifying tag for
         // the event.
@@ -165,12 +159,12 @@ class DummyServerImp final {
       if (cq_->Next(&tag, &ok) && ok) {
         // run this in a new thread
         CallData* curr = static_cast<CallData*>(tag);
+        std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         if (curr->isDone()) {
           curr->Proceed();
           continue;
         }
-        cout << "got something!, has status " << curr->getStatus() << endl;
-        std::thread t(&DummyServerImp::RunAndGatherData, this, curr);
+        std::thread t(&DummyServerImp::RunAndGatherData, this, curr, start_time);
         threads.push_back(std::move(t));
       } else {
         cout << "closing b/c returned false" << endl;
@@ -182,36 +176,27 @@ class DummyServerImp final {
     }
   }
 
-  void RunAndGatherData(CallData* toRun) {
+  void RunAndGatherData(CallData* toRun, std::chrono::high_resolution_clock::time_point start_time) {
 
     struct rusage usage_stats;
 
-    // std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
-    std::thread t(&DummyServerImp::runWrapper, this, toRun, &usage_stats);
+    std::thread t(&DummyServerImp::runWrapper, this, toRun, &usage_stats, start_time);
     t.join();
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
-    // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
-    // float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
-    //                         + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
-    // float mem_used = usage_stats.ru_maxrss / 1000;
-    // cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
+    float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
+                            + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
+    float mem_used = usage_stats.ru_maxrss / 1000;
+    cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
 
   }
 
-  void runWrapper(CallData* toRun, struct rusage* usage_stats) {
+  void runWrapper(CallData* toRun, struct rusage* usage_stats, std::chrono::high_resolution_clock::time_point start_time) {
 
-    std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
 
     toRun->Proceed();
 
     getrusage(RUSAGE_THREAD, usage_stats);
-
-    float runtime = (usage_stats->ru_utime.tv_sec * 1000.0 + (usage_stats->ru_utime.tv_usec/1000.0))
-                            + (usage_stats->ru_stime.tv_sec * 1000.0 + (usage_stats->ru_stime.tv_usec/1000.0));
-    float mem_used = usage_stats->ru_maxrss / 1000;
-    cout << "thread " << gettid() << " had runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
-
 
   }
 
