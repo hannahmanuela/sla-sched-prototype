@@ -88,15 +88,11 @@ class DummyServerImp final {
 
         // The actual processing.
         std::string prefix("Hello ");
-        int to_factor = 99995349;
-        std::vector<int> factors;
-
-        for (int i = 1; i <= to_factor; i++) {
-            if (to_factor % i == 0) {
-                factors.push_back(i);
-            }
+        long long sum = 0;
+        for (long long i = 0; i < 100000000; i++) {
+            sum = 3 * i + 1;
         }
-        reply_.set_answer(prefix + request_.param1());
+        reply_.set_answer(prefix + std::to_string(sum) + request_.param1());
         
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
@@ -113,6 +109,20 @@ class DummyServerImp final {
         // Once in the FINISH state, deallocate ourselves (CallData).
         delete this;
       }
+    }
+
+    string getStatus() {
+      if (status_ == CREATE) {
+        return "create";
+      } else if (status_ == PROCESS) {
+        return "process";
+      } else {
+        return "finish";
+      }
+    }
+
+    bool isDone() {
+      return status_ == FINISH;
     }
 
    private:
@@ -154,8 +164,12 @@ class DummyServerImp final {
       // TODO: can use the tag to host different services? (here: https://groups.google.com/g/grpc-io/c/bXMmfah57h4/m/EUg2B8o1AgAJ)
       if (cq_->Next(&tag, &ok) && ok) {
         // run this in a new thread
-        cout << "got something!" << endl;
         CallData* curr = static_cast<CallData*>(tag);
+        if (curr->isDone()) {
+          curr->Proceed();
+          continue;
+        }
+        cout << "got something!, has status " << curr->getStatus() << endl;
         std::thread t(&DummyServerImp::RunAndGatherData, this, curr);
         threads.push_back(std::move(t));
       } else {
@@ -172,24 +186,32 @@ class DummyServerImp final {
 
     struct rusage usage_stats;
 
-    std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
+    // std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
     std::thread t(&DummyServerImp::runWrapper, this, toRun, &usage_stats);
     t.join();
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
     // float runtime = (usage_stats.ru_utime.tv_usec + usage_stats.ru_stime.tv_usec)/1000;
-    float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
-                            + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
-    float mem_used = usage_stats.ru_maxrss / 1000;
-    cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
+    // float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
+    //                         + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
+    // float mem_used = usage_stats.ru_maxrss / 1000;
+    // cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
 
   }
 
   void runWrapper(CallData* toRun, struct rusage* usage_stats) {
 
+    std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
+
     toRun->Proceed();
 
     getrusage(RUSAGE_THREAD, usage_stats);
+
+    float runtime = (usage_stats->ru_utime.tv_sec * 1000.0 + (usage_stats->ru_utime.tv_usec/1000.0))
+                            + (usage_stats->ru_stime.tv_sec * 1000.0 + (usage_stats->ru_stime.tv_usec/1000.0));
+    float mem_used = usage_stats->ru_maxrss / 1000;
+    cout << "thread " << gettid() << " had runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl;  
+
 
   }
 
