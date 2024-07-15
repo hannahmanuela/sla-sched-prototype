@@ -21,51 +21,96 @@ using grpc::ServerBuilder;
 using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
-using dummyserver::DummyServer;
+using dummyserver::StatefulDummyServer;
 using dummyserver::DummyRequest;
 using dummyserver::DummyReply;
 
-#ifndef DUMMY_SRV_H
-#define DUMMY_SRV_H
+// Simple POD struct used as an argument wrapper for calls
+struct CallDataStruct {
+  StatefulDummyServer::AsyncService* service_;
+  ServerCompletionQueue* cq_;
+  string globalInfo;
+};
 
-// Class encompasing the state and logic needed to serve a request.
-class CallData {
-  public:
-  // Take in the "service" instance (in this case representing an asynchronous
-  // server) and the completion queue "cq" used for asynchronous communication
-  // with the gRPC runtime.
-  CallData(DummyServer::AsyncService* service, ServerCompletionQueue* cq)
-      : service_(service), cq_(cq), responder_(&ctx_), status_(PROCESS) {
-    // Invoke the serving logic right away.
-    service_->RequestDoStuff(&ctx_, &request_, &responder_, cq_, cq_,
-                                this);
+// Base class used to cast the void* tags we get from
+// the completion queue and call Proceed() on them.
+class Call {
+ public:
+  virtual void Proceed() = 0;
+  virtual bool isDone() = 0;
+};
+
+class SetStateCall final : public Call {
+ public:
+  explicit SetStateCall(CallDataStruct* data)
+      : data_(data), responder_(&ctx_), status_(REQUEST) {
+    data->service_->RequestSetState(&ctx_, &request_, &responder_, data_->cq_,
+                              data_->cq_, this);
   }
 
   void Proceed() {
-    if (status_ == PROCESS) {
-      // Spawn a new CallData instance to serve new clients while we process
-      // the one for this CallData. The instance will deallocate itself as
-      // part of its FINISH state.
-      new CallData(service_, cq_);
 
-      // The actual processing.
-      std::string prefix("Hello ");
-      long long sum = 0;
-      for (long long i = 0; i < 100000000; i++) {
-          sum = 3 * i + 1;
+    switch (status_) {
+      case REQUEST:
+        new SetStateCall(data_);
+        
+        data_->globalInfo = request_.param1();
+        reply_.set_answer("done");
+
+        status_ = FINISH;
+        responder_.Finish(reply_, Status::OK, this);
+        break;
+
+      case FINISH:
+        delete this;
+        break;
+    }
+  }
+
+  bool isDone() {
+    return status_ == FINISH;
+  }
+
+ private:
+  CallDataStruct* data_;
+  ServerContext ctx_;
+
+  ServerAsyncResponseWriter<DummyReply> responder_;
+  DummyRequest request_;
+  DummyReply reply_;
+
+  enum CallStatus { REQUEST, FINISH };
+  CallStatus status_;
+};
+
+class DoStuffCall final : public Call {
+ public:
+  explicit DoStuffCall(CallDataStruct* data)
+      : data_(data), responder_(&ctx_), status_(REQUEST) {
+    data->service_->RequestStatefulDoStuff(&ctx_, &request_, &responder_, data_->cq_,
+                              data_->cq_, this);
+  }
+
+  void Proceed() {
+
+    switch (status_) {
+      case REQUEST: {
+        new DoStuffCall(data_);
+        
+        // The actual processing.
+        long long sum = 0;
+        for (long long i = 0; i < 100000000; i++) {
+            sum = 3 * i + 1;
+        }
+        reply_.set_answer(data_->globalInfo + std::to_string(sum) + request_.param1());
+
+        status_ = FINISH;
+        responder_.Finish(reply_, Status::OK, this);
+        break;
       }
-      reply_.set_answer(prefix + std::to_string(sum) + request_.param1());
-      
-      // And we are done! Let the gRPC runtime know we've finished, using the
-      // memory address of this instance as the uniquely identifying tag for
-      // the event.
-      status_ = FINISH;
-      responder_.Finish(reply_, Status::OK, this);
-      
-    } else {
-      CHECK_EQ(status_, FINISH);
-      // Once in the FINISH state, deallocate ourselves (CallData).
-      delete this;
+      case FINISH:
+        delete this;
+        break;
     }
   }
 
@@ -73,35 +118,22 @@ class CallData {
     return (status_ == FINISH);
   }
 
-  private:
-  // The means of communication with the gRPC runtime for an asynchronous
-  // server.
-  DummyServer::AsyncService* service_;
-  // The producer-consumer queue where for asynchronous server notifications.
-  ServerCompletionQueue* cq_;
-  // Context for the rpc, allowing to tweak aspects of it such as the use
-  // of compression, authentication, as well as to send metadata back to the
-  // client.
+ private:
+  CallDataStruct* data_;
   ServerContext ctx_;
 
-  // What we get from the client.
+  ServerAsyncResponseWriter<DummyReply> responder_;
   DummyRequest request_;
-  // What we send back to the client.
   DummyReply reply_;
 
-  // The means to get back to the client.
-  ServerAsyncResponseWriter<DummyReply> responder_;
-
-  // Let's implement a tiny state machine with the following states.
-  enum CallStatus { PROCESS, FINISH };
-  CallStatus status_;  // The current serving state.
+  enum CallStatus { REQUEST, FINISH };
+  CallStatus status_;
 };
 
 
-
-class DummyServerImp final {
+class StatefulDummyServerImp final {
  public:
-  ~DummyServerImp() {
+  ~StatefulDummyServerImp() {
     server_->Shutdown();
     // Always shutdown the completion queue after the server.
     cq_->Shutdown();
@@ -111,7 +143,7 @@ class DummyServerImp final {
   void Run() {
     ServerBuilder builder;
     // Listen on the given address without any authentication mechanism.
-    builder.AddListeningPort(DISPATCHER_ADDR_GEN, grpc::InsecureServerCredentials());
+    builder.AddListeningPort(DISPATCHER_ADDR_STATEFUL_1, grpc::InsecureServerCredentials());
     builder.RegisterService(&service_);
     
     // Get hold of the completion queue used for the asynchronous communication
@@ -120,7 +152,7 @@ class DummyServerImp final {
     
     // assemble the server.
     server_ = builder.BuildAndStart();
-    cout << "Server listening on " << DISPATCHER_ADDR_GEN << endl;
+    cout << "Server listening on " << DISPATCHER_ADDR_STATEFUL_1 << endl;
 
     HandleRpcs();
   }
@@ -128,8 +160,11 @@ class DummyServerImp final {
  private:
 
   void HandleRpcs() {
+    
     // Spawn a new CallData instance to serve new clients.
-    new CallData(&service_, cq_.get());
+    CallDataStruct data{&service_, cq_.get(), global_info_};
+    new SetStateCall(&data);
+    new DoStuffCall(&data);
     void* tag;  // uniquely identifies a request.
     bool ok;
     std::vector<std::thread> threads;
@@ -142,13 +177,13 @@ class DummyServerImp final {
       // TODO: can use the tag to host different services? (here: https://groups.google.com/g/grpc-io/c/bXMmfah57h4/m/EUg2B8o1AgAJ)
       if (cq_->Next(&tag, &ok) && ok) {
         // run this in a new thread
-        CallData* curr = static_cast<CallData*>(tag);
+        Call* curr = static_cast<Call*>(tag);
         std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         if (curr->isDone()) {
           curr->Proceed();
           continue;
         }
-        std::thread t(&DummyServerImp::RunAndGatherData, this, curr, start_time);
+        std::thread t(&StatefulDummyServerImp::RunAndGatherData, this, curr, start_time);
         threads.push_back(std::move(t));
       } else {
         cout << "closing b/c returned false" << endl;
@@ -160,11 +195,11 @@ class DummyServerImp final {
     }
   }
 
-  void RunAndGatherData(CallData* toRun, std::chrono::high_resolution_clock::time_point start_time) {
+  void RunAndGatherData(Call* toRun, std::chrono::high_resolution_clock::time_point start_time) {
 
     struct rusage usage_stats;
 
-    std::thread t(&DummyServerImp::runWrapper, this, toRun, &usage_stats, start_time);
+    std::thread t(&StatefulDummyServerImp::runWrapper, this, toRun, &usage_stats, start_time);
     t.join();
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
@@ -175,7 +210,8 @@ class DummyServerImp final {
 
   }
 
-  void runWrapper(CallData* toRun, struct rusage* usage_stats, std::chrono::high_resolution_clock::time_point start_time) {
+  void runWrapper(Call* toRun, struct rusage* usage_stats, std::chrono::high_resolution_clock::time_point start_time) {
+
 
     toRun->Proceed();
 
@@ -189,9 +225,8 @@ class DummyServerImp final {
   }
 
   std::unique_ptr<ServerCompletionQueue> cq_;
-  DummyServer::AsyncService service_;
+  StatefulDummyServer::AsyncService service_;
   std::unique_ptr<Server> server_;
+  string global_info_;
 };
 
-
-#endif  // DUMMY_SRV_H

@@ -8,6 +8,14 @@ service DummyServer {
 
 }
 
+service StatefulDummyServer {
+
+    rpc StatefulDoStuff(DummyRequest) returns (DummyReply) {}
+
+    rpc SetState(DummyRequest) returns (DummyReply) {}
+
+}
+
 message DummyRequest {
   string param1 = 1;
 }

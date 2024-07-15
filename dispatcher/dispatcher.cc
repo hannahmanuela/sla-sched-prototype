@@ -1,5 +1,6 @@
 
 #include "dummy_srv.h"
+#include "stateful_dummy_srv.h"
 #include "consts.h"
 #include "dispatcher.h"
 
@@ -23,7 +24,13 @@ void Dispatcher::run() {
 
     // start dummySrv
     DummyServerImp server;
-    server.Run(2);
+    StatefulDummyServerImp stateful_ex_server;
+
+    std::thread t1(&DummyServerImp::Run, &server);
+    std::thread t2(&StatefulDummyServerImp::Run, &stateful_ex_server);
+
+    t1.join();
+    t2.join();
 }
 
 

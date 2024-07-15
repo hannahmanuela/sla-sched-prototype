@@ -25,18 +25,9 @@ class DummyClient {
     DummyRequest request;
     request.set_param1(inp);
 
-    // Container for the data we expect from the server.
     DummyReply reply;
-
-    // Context for the client. It could be used to convey extra information to
-    // the server and/or tweak certain RPC behaviors.
     ClientContext context;
-
-    // The producer-consumer queue we use to communicate asynchronously with the
-    // gRPC runtime.
     CompletionQueue cq;
-
-    // Storage for the status of the RPC upon completion.
     Status status;
 
     // stub_->PrepareAsyncSayHello() creates an RPC object, returning
@@ -46,7 +37,6 @@ class DummyClient {
     std::unique_ptr<ClientAsyncResponseReader<DummyReply> > rpc(
         stub_->PrepareAsyncDoStuff(&context, request, &cq));
 
-    // StartCall initiates the RPC call
     rpc->StartCall();
 
     // Request that, upon completion of the RPC, "reply" be updated with the

@@ -18,29 +18,56 @@ using namespace std;
 #include "lb.h"
 #include "consts.h"
 #include "dummy_clnt.h"
+#include "stateful_dummy_clnt.h"
 
 
-void doTheThing(std::string inp, DummyClient* clnt) {
+void doTheThingGen(std::string inp, DummyClient* clnt) {
         std::string reply = clnt->DoStuff(inp); 
         std::cout << "resp received: " << reply << std::endl;  
 }
 
-void LB::runDummyEx() {
-
-    DummyClient clnt(grpc::CreateChannel(DISPATCHER_ADDR, grpc::InsecureChannelCredentials()));
-
+void runGenClient(DummyClient* clnt) {
+    
     std::vector<std::thread> threads;
     
     for (int i = 0; i < 2; i++) {
         std::string inp = std::to_string(i);
-        // doTheThing(inp, &clnt);
-        std::thread t(doTheThing, inp, &clnt);
+        std::thread t(doTheThingGen, inp, clnt);
         threads.push_back(std::move(t));
     }
 
     for (std::thread& t : threads) {
         t.join();
     }
+}
+
+void runStatefulClient(StatefulDummyClient* clnt) {
+
+    std::string reply = clnt->SetState("global info!: "); 
+    std::cout << "resp received: " << reply << std::endl;  
+
+    reply = clnt->StatefulDoStuff("test"); 
+    std::cout << "resp received: " << reply << std::endl;
+
+    reply = clnt->SetState("global info2!: "); 
+    std::cout << "resp received: " << reply << std::endl;  
+
+    reply = clnt->StatefulDoStuff("test"); 
+    std::cout << "resp received: " << reply << std::endl;  
+    
+}
+
+void LB::runDummyEx() {
+
+    DummyClient clnt(grpc::CreateChannel(DISPATCHER_ADDR_GEN, grpc::InsecureChannelCredentials()));
+
+    StatefulDummyClient stateful_clnt(grpc::CreateChannel(DISPATCHER_ADDR_STATEFUL_1, grpc::InsecureChannelCredentials()));
+
+    // std::thread t1(runGenClient, &clnt);
+    std::thread t2(runStatefulClient, &stateful_clnt);
+
+    // t1.join();
+    t2.join();
 
 }
 
