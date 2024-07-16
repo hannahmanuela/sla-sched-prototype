@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package mainserver;
+
+service MainServer {
+
+    rpc OkToPlace(ProcInfo) returns (PlacementReply) {}
+
+}
+
+message ProcInfo {
+  float memUsg = 1;
+  float compUsg = 2;
+}
+
+message PlacementReply {
+  bool okToPlace = 1;
+  float ratio = 2;
+}

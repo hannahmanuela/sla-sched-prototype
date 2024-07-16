@@ -1,7 +1,7 @@
 #include <grpc/grpc.h>
 
 
-#include "dummy.grpc.pb.h"
+#include "main.grpc.pb.h"
 
 
 using grpc::Channel;
@@ -9,23 +9,24 @@ using grpc::ClientAsyncResponseReader;
 using grpc::ClientContext;
 using grpc::CompletionQueue;
 using grpc::Status;
-using dummyserver::DummyServer;
-using dummyserver::DummyRequest;
-using dummyserver::DummyReply;
+using mainserver::MainServer;
+using mainserver::ProcInfo;
+using mainserver::PlacementReply;
 
-class DummyClient {
+class MainClient {
  public:
-  explicit DummyClient(std::shared_ptr<Channel> channel)
-      : stub_(DummyServer::NewStub(channel)) {}
+  explicit MainClient(std::shared_ptr<Channel> channel)
+      : stub_(MainServer::NewStub(channel)) {}
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
-  std::string DoStuff(const std::string& inp) {
+  PlacementReply OkToPlace(float mem_usg, float comp_usg) {
     // Data we are sending to the server.
-    DummyRequest request;
-    request.set_param1(inp);
+    ProcInfo request;
+    request.set_compusg(comp_usg);
+    request.set_memusg(mem_usg);
 
-    DummyReply reply;
+    PlacementReply reply;
     ClientContext context;
     CompletionQueue cq;
     Status status;
@@ -34,8 +35,8 @@ class DummyClient {
     // an instance to store in "call" but does not actually start the RPC
     // Because we are using the asynchronous API, we need to hold on to
     // the "call" instance in order to get updates on the ongoing RPC.
-    std::unique_ptr<ClientAsyncResponseReader<DummyReply> > rpc(
-        stub_->PrepareAsyncDoStuff(&context, request, &cq));
+    std::unique_ptr<ClientAsyncResponseReader<PlacementReply> > rpc(
+        stub_->PrepareAsyncOkToPlace(&context, request, &cq));
 
     rpc->StartCall();
 
@@ -57,16 +58,11 @@ class DummyClient {
     // corresponds solely to the request for updates introduced by Finish().
     GPR_ASSERT(ok);
 
-    // Act upon the status of the actual RPC.
-    if (status.ok()) {
-      return reply.answer();
-    } else {
-      return "RPC failed";
-    }
+    return reply;
   }
 
  private:
   // Out of the passed in Channel comes the stub, stored here, our view of the
   // server's exposed services.
-  std::unique_ptr<DummyServer::Stub> stub_;
+  std::unique_ptr<MainServer::Stub> stub_;
 };

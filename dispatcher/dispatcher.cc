@@ -1,6 +1,5 @@
 
-#include "dummy_srv.h"
-#include "stateful_dummy_srv.h"
+#include "main_srv.h"
 #include "consts.h"
 #include "dispatcher.h"
 
@@ -9,7 +8,7 @@ int Dispatcher::time_since_start_() {
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
 }
 
-void Dispatcher::run() {
+void Dispatcher::run(string port) {
 
     // cpu_set_t mask;
     // CPU_ZERO(&mask);
@@ -23,24 +22,29 @@ void Dispatcher::run() {
     cout << "dispatcher main process: " << getpid() << endl;
 
     // start dummySrv
-    DummyServerImp server;
-    StatefulDummyServerImp stateful_ex_server;
+    MainServerImp server;
 
-    std::thread t1(&DummyServerImp::Run, &server);
-    std::thread t2(&StatefulDummyServerImp::Run, &stateful_ex_server);
+    std::thread t1(&MainServerImp::Run, &server, port);
 
     t1.join();
-    t2.join();
 }
 
 
+int main(int argc, char *argv[]) {
+    
+    if (argc != 2) {
+        cerr << "Usage: " << argv[0] << " port\n";
+        return 1;
+    }
 
+    string port = argv[1];
 
-int main() {    
-    // create dispatcher instance
+     // create dispatcher instance
     // hardcoding id for now
     Dispatcher d = Dispatcher(0);
 
     // run it
-    d.run();
-}
+    d.run(port);
+
+}   
+   

@@ -1,11 +1,6 @@
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
 #include <thread>
 #include <iostream>
+#include <climits> 
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -16,83 +11,79 @@
 using namespace std;
 
 #include "lb.h"
-#include "consts.h"
-#include "dummy_clnt.h"
-#include "stateful_dummy_clnt.h"
 
 
-void doTheThingGen(std::string inp, DummyClient* clnt) {
-        std::string reply = clnt->DoStuff(inp); 
-        std::cout << "resp received: " << reply << std::endl;  
-}
+MainClient* LB::placeRPCCall(ProcType type) {
 
-void runGenClient(DummyClient* clnt) {
-    
-    std::vector<std::thread> threads;
-    
-    for (int i = 0; i < 2; i++) {
-        std::string inp = std::to_string(i);
-        std::thread t(doTheThingGen, inp, clnt);
-        threads.push_back(std::move(t));
+    ProcTypeProfile profile = types_.at(type);
+
+    // pick a dispatcher
+    vector<MainClient*> contender_dispatchers;
+    MainClient* disp_to_use;
+
+    int min_val = INT_MAX;
+    for (auto disp : dispatchers_) {
+        PlacementReply reply = disp->OkToPlace(profile.mem->avg + profile.mem->std_dev, profile.compute_max);
+        if (reply.oktoplace() && reply.ratio() < min_val)  {
+            min_val = reply.ratio();
+            disp_to_use = disp;
+        }
     }
 
-    for (std::thread& t : threads) {
-        t.join();
-    }
-}
-
-void runStatefulClient(StatefulDummyClient* clnt) {
-
-    std::string reply = clnt->SetState("global info!: "); 
-    std::cout << "resp received: " << reply << std::endl;  
-
-    reply = clnt->StatefulDoStuff("test"); 
-    std::cout << "resp received: " << reply << std::endl;
-
-    reply = clnt->SetState("global info2!: "); 
-    std::cout << "resp received: " << reply << std::endl;  
-
-    reply = clnt->StatefulDoStuff("test"); 
-    std::cout << "resp received: " << reply << std::endl;  
-    
-}
-
-void LB::runDummyEx() {
-
-    DummyClient clnt(grpc::CreateChannel(DISPATCHER_ADDR_GEN, grpc::InsecureChannelCredentials()));
-
-    StatefulDummyClient stateful_clnt(grpc::CreateChannel(DISPATCHER_ADDR_STATEFUL_1, grpc::InsecureChannelCredentials()));
-
-    // std::thread t1(runGenClient, &clnt);
-    std::thread t2(runStatefulClient, &stateful_clnt);
-
-    // t1.join();
-    t2.join();
-
+    return disp_to_use;
 }
 
 void LB::run() {
 
-    // cpu_set_t mask;
-    // CPU_ZERO(&mask);
-    // CPU_SET(CORE_LB_WEBSITE_RUN_ON, &mask);
-    // if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
-    //     cout << "set affinity had an error" << endl;
-    // }
+    // TODO: remove this test
+    for (auto disp : dispatchers_) {
+        PlacementReply reply = disp->OkToPlace(10.0, 10.0);
+        cout << "got reply from dispatcher, ok: " << reply.oktoplace() << ", ratio: " << reply.ratio() << endl;
+    }
 
-    cout << "LB main process: " << getpid() << endl;
+    // gen load
+    // place each proc
 
-    std::thread client_thread(&LB::runDummyEx, this);
+}
 
-    client_thread.join();
+
+void LB::init(int argc, char *argv[]) {
+
+    // read in all the port numbers
+    vector<string> port_numbers;
+    for (int i = 1; i < argc; ++i) {
+        string port = argv[i];
+        port_numbers.push_back(port);
+    }
+
+    // populate the proc profiles - hardcoded for now
+    // TODO: this
+
+    // connect to all the dispatchers
+    for (string dispatcher_port : port_numbers) {
+        string dispatcher_addr = "0.0.0.0:" + dispatcher_port;
+        MainClient* clnt = new MainClient(grpc::CreateChannel(dispatcher_addr, grpc::InsecureChannelCredentials()));
+
+        dispatchers_.push_back(clnt);
+    }
+
+    cout << "LB started" << endl;
+
 }
 
 
 
-
-int main() {
-    // create lb instance
+int main(int argc, char *argv[]) {
+    
+    if (argc < 2) {
+        cout << "Usage: " << argv[0] << " <port1> <port2> ... <portN>" << endl;
+        return 1;
+    }
+    
     LB* lb = new LB();
-    // run it
+
+    lb->init(argc, argv);
     lb->run();
+
+    return 0;
 }

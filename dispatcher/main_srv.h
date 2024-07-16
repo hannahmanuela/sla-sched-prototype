@@ -12,8 +12,8 @@
 using namespace std;
 
 #include "consts.h"
-#include "dummy.pb.h"
-#include "dummy.grpc.pb.h"
+#include "main.pb.h"
+#include "main.grpc.pb.h"
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -21,15 +21,14 @@ using grpc::ServerBuilder;
 using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
-using dummyserver::StatefulDummyServer;
-using dummyserver::DummyRequest;
-using dummyserver::DummyReply;
+using mainserver::MainServer;
+using mainserver::ProcInfo;
+using mainserver::PlacementReply;
 
 // Simple POD struct used as an argument wrapper for calls
 struct CallDataStruct {
-  StatefulDummyServer::AsyncService* service_;
+  MainServer::AsyncService* service_;
   ServerCompletionQueue* cq_;
-  string globalInfo;
 };
 
 // Base class used to cast the void* tags we get from
@@ -40,11 +39,11 @@ class Call {
   virtual bool isDone() = 0;
 };
 
-class SetStateCall final : public Call {
+class OkToPlaceCall final : public Call {
  public:
-  explicit SetStateCall(CallDataStruct* data)
+  explicit OkToPlaceCall(CallDataStruct* data)
       : data_(data), responder_(&ctx_), status_(REQUEST) {
-    data->service_->RequestSetState(&ctx_, &request_, &responder_, data_->cq_,
+    data->service_->RequestOkToPlace(&ctx_, &request_, &responder_, data_->cq_,
                               data_->cq_, this);
   }
 
@@ -52,10 +51,12 @@ class SetStateCall final : public Call {
 
     switch (status_) {
       case REQUEST:
-        new SetStateCall(data_);
+        new OkToPlaceCall(data_);
         
-        data_->globalInfo = request_.param1();
-        reply_.set_answer("done");
+        // TODO: this! will need access to underlying queue info
+        // dummy info for now...
+        reply_.set_oktoplace(true);
+        reply_.set_ratio(1);        
 
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
@@ -75,75 +76,29 @@ class SetStateCall final : public Call {
   CallDataStruct* data_;
   ServerContext ctx_;
 
-  ServerAsyncResponseWriter<DummyReply> responder_;
-  DummyRequest request_;
-  DummyReply reply_;
-
-  enum CallStatus { REQUEST, FINISH };
-  CallStatus status_;
-};
-
-class DoStuffCall final : public Call {
- public:
-  explicit DoStuffCall(CallDataStruct* data)
-      : data_(data), responder_(&ctx_), status_(REQUEST) {
-    data->service_->RequestStatefulDoStuff(&ctx_, &request_, &responder_, data_->cq_,
-                              data_->cq_, this);
-  }
-
-  void Proceed() {
-
-    switch (status_) {
-      case REQUEST: {
-        new DoStuffCall(data_);
-        
-        // The actual processing.
-        long long sum = 0;
-        for (long long i = 0; i < 100000000; i++) {
-            sum = 3 * i + 1;
-        }
-        reply_.set_answer(data_->globalInfo + std::to_string(sum) + request_.param1());
-
-        status_ = FINISH;
-        responder_.Finish(reply_, Status::OK, this);
-        break;
-      }
-      case FINISH:
-        delete this;
-        break;
-    }
-  }
-
-  bool isDone() {
-    return (status_ == FINISH);
-  }
-
- private:
-  CallDataStruct* data_;
-  ServerContext ctx_;
-
-  ServerAsyncResponseWriter<DummyReply> responder_;
-  DummyRequest request_;
-  DummyReply reply_;
+  ServerAsyncResponseWriter<PlacementReply> responder_;
+  ProcInfo request_;
+  PlacementReply reply_;
 
   enum CallStatus { REQUEST, FINISH };
   CallStatus status_;
 };
 
 
-class StatefulDummyServerImp final {
+class MainServerImp final {
  public:
-  ~StatefulDummyServerImp() {
+  ~MainServerImp() {
     server_->Shutdown();
     // Always shutdown the completion queue after the server.
     cq_->Shutdown();
   }
 
   // There is no shutdown handling in this code.
-  void Run() {
+  void Run(string port) {
     ServerBuilder builder;
+    string dispatcher_addr = "0.0.0.0:" + port;
     // Listen on the given address without any authentication mechanism.
-    builder.AddListeningPort(DISPATCHER_ADDR_STATEFUL_1, grpc::InsecureServerCredentials());
+    builder.AddListeningPort(dispatcher_addr, grpc::InsecureServerCredentials());
     builder.RegisterService(&service_);
     
     // Get hold of the completion queue used for the asynchronous communication
@@ -152,7 +107,7 @@ class StatefulDummyServerImp final {
     
     // assemble the server.
     server_ = builder.BuildAndStart();
-    cout << "Server listening on " << DISPATCHER_ADDR_STATEFUL_1 << endl;
+    cout << "Server listening on " << dispatcher_addr << endl;
 
     HandleRpcs();
   }
@@ -162,9 +117,8 @@ class StatefulDummyServerImp final {
   void HandleRpcs() {
     
     // Spawn a new CallData instance to serve new clients.
-    CallDataStruct data{&service_, cq_.get(), global_info_};
-    new SetStateCall(&data);
-    new DoStuffCall(&data);
+    CallDataStruct data{&service_, cq_.get()};
+    new OkToPlaceCall(&data);
     void* tag;  // uniquely identifies a request.
     bool ok;
     std::vector<std::thread> threads;
@@ -183,7 +137,7 @@ class StatefulDummyServerImp final {
           curr->Proceed();
           continue;
         }
-        std::thread t(&StatefulDummyServerImp::RunAndGatherData, this, curr, start_time);
+        std::thread t(&MainServerImp::RunAndGatherData, this, curr, start_time);
         threads.push_back(std::move(t));
       } else {
         cout << "closing b/c returned false" << endl;
@@ -199,7 +153,7 @@ class StatefulDummyServerImp final {
 
     struct rusage usage_stats;
 
-    std::thread t(&StatefulDummyServerImp::runWrapper, this, toRun, &usage_stats, start_time);
+    std::thread t(&MainServerImp::runWrapper, this, toRun, &usage_stats, start_time);
     t.join();
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
@@ -211,7 +165,6 @@ class StatefulDummyServerImp final {
   }
 
   void runWrapper(Call* toRun, struct rusage* usage_stats, std::chrono::high_resolution_clock::time_point start_time) {
-
 
     toRun->Proceed();
 
@@ -225,8 +178,7 @@ class StatefulDummyServerImp final {
   }
 
   std::unique_ptr<ServerCompletionQueue> cq_;
-  StatefulDummyServer::AsyncService service_;
+  MainServer::AsyncService service_;
   std::unique_ptr<Server> server_;
-  string global_info_;
 };
 

@@ -41,11 +41,11 @@ class ProcTypeProfile {
     public:
         ProcType type;
         Distribution* mem;
-        Distribution* compute;
+        float compute_max;
 
-        ProcTypeProfile(float init_mem, float init_compute) {
+        ProcTypeProfile(float init_mem, float comp_max) {
             mem = new Distribution(init_mem);
-            compute = new Distribution(init_compute);
+            compute_max = comp_max;
         };
 
 
