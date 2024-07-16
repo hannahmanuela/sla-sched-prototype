@@ -1,5 +1,6 @@
 
 #include "main_srv.h"
+#include "website_ex_srv.h"
 #include "consts.h"
 #include "dispatcher.h"
 
@@ -8,7 +9,7 @@ int Dispatcher::time_since_start_() {
     return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
 }
 
-void Dispatcher::run(string port) {
+void Dispatcher::run() {
 
     // cpu_set_t mask;
     // CPU_ZERO(&mask);
@@ -21,30 +22,28 @@ void Dispatcher::run(string port) {
 
     cout << "dispatcher main process: " << getpid() << endl;
 
-    // start dummySrv
+    // start mainSrv
     MainServerImp server;
+    WebsiteServerImp web_server;
 
-    std::thread t1(&MainServerImp::Run, &server, port);
+    Queue* q = new Queue();
+
+    std::thread t1(&MainServerImp::Run, &server, DISPATCHER_MAIN_PORT, q);
+    std::thread t2(&WebsiteServerImp::Run, &web_server, DISPATCHER_WEBSITE_PORT, q);
 
     t1.join();
+    t2.join();
 }
 
 
-int main(int argc, char *argv[]) {
-    
-    if (argc != 2) {
-        cerr << "Usage: " << argv[0] << " port\n";
-        return 1;
-    }
-
-    string port = argv[1];
+int main() {
 
      // create dispatcher instance
     // hardcoding id for now
     Dispatcher d = Dispatcher(0);
 
     // run it
-    d.run(port);
+    d.run();
 
 }   
    

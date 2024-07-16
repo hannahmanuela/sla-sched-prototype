@@ -9,25 +9,25 @@ using grpc::ClientAsyncResponseReader;
 using grpc::ClientContext;
 using grpc::CompletionQueue;
 using grpc::Status;
-using mainserver::MainServer;
+using mainserver::WebsiteServer;
 using mainserver::ProcInfo;
-using mainserver::PlacementReply;
+using mainserver::ProfilePage;
 
-class MainClient {
+class WebsiteClient {
  public:
-  explicit MainClient(std::shared_ptr<Channel> channel)
-      : stub_(MainServer::NewStub(channel)) {}
+  explicit WebsiteClient(std::shared_ptr<Channel> channel)
+      : stub_(WebsiteServer::NewStub(channel)) {}
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
-  PlacementReply OkToPlace(float mem_usg, float comp_ceil, float deadline) {
+  ProfilePage GetProfilePage(float mem_usg, float comp_ceil, float deadline) {
     // Data we are sending to the server.
     ProcInfo request;
     request.set_compceil(comp_ceil);
     request.set_compdeadline(deadline);
     request.set_memusg(mem_usg);
 
-    PlacementReply reply;
+    ProfilePage reply;
     ClientContext context;
     CompletionQueue cq;
     Status status;
@@ -36,8 +36,8 @@ class MainClient {
     // an instance to store in "call" but does not actually start the RPC
     // Because we are using the asynchronous API, we need to hold on to
     // the "call" instance in order to get updates on the ongoing RPC.
-    std::unique_ptr<ClientAsyncResponseReader<PlacementReply> > rpc(
-        stub_->PrepareAsyncOkToPlace(&context, request, &cq));
+    std::unique_ptr<ClientAsyncResponseReader<ProfilePage> > rpc(
+        stub_->PrepareAsyncGetProfilePage(&context, request, &cq));
 
     rpc->StartCall();
 
@@ -65,5 +65,5 @@ class MainClient {
  private:
   // Out of the passed in Channel comes the stub, stored here, our view of the
   // server's exposed services.
-  std::unique_ptr<MainServer::Stub> stub_;
+  std::unique_ptr<WebsiteServer::Stub> stub_;
 };

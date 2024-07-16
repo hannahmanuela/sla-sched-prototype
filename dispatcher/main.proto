@@ -10,10 +10,22 @@ service MainServer {
 
 message ProcInfo {
   float memUsg = 1;
-  float compUsg = 2;
+  float compCeil = 2;
+  float compDeadline = 3;
 }
 
 message PlacementReply {
   bool okToPlace = 1;
   float ratio = 2;
+}
+
+
+service WebsiteServer {
+
+    rpc GetProfilePage(ProcInfo) returns (ProfilePage) {}
+
+}
+
+message ProfilePage {
+  uint64 retVal = 1;
 }

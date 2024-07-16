@@ -5,6 +5,7 @@
 #include "machine.h"
 #include "consts.h"
 #include "main_clnt.h"
+#include "website_ex_clnt.h"
 #include "proc_type.h"
 
 using namespace std;
@@ -18,14 +19,15 @@ class LB {
     public:
         LB() {};
 
-        void init(int argc, char *argv[]);
+        void init();
         void run();
+        void runProc(ProcTypeProfile profile, WebsiteClient* to_use);
 
     private:
 
-        MainClient* placeRPCCall(ProcType type);
+        WebsiteClient* pickDispatcher(ProcType type);
 
-        vector<MainClient*> dispatchers_;
+        vector<tuple<MainClient*, WebsiteClient*>> dispatchers_;
         map<ProcType, ProcTypeProfile> types_;
 
 };

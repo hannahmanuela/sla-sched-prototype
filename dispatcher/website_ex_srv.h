@@ -23,48 +23,42 @@ using grpc::ServerBuilder;
 using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
-using mainserver::MainServer;
+using mainserver::WebsiteServer;
 using mainserver::ProcInfo;
-using mainserver::PlacementReply;
+using mainserver::ProfilePage;
 
 // Simple POD struct used as an argument wrapper for calls
-struct MainCallDataStruct {
-  MainServer::AsyncService* service_;
+struct WebsiteCallDataStruct {
+  WebsiteServer::AsyncService* service_;
   ServerCompletionQueue* cq_;
-  Queue* proc_queue;
 };
 
-// Base class used to cast the void* tags we get from
-// the completion queue and call Proceed() on them.
-class Call {
+class GetProfilePageCall final : public Call {
  public:
-  virtual void Proceed() = 0;
-  virtual bool isDone() = 0;
-};
-
-class OkToPlaceCall final : public Call {
- public:
-  explicit OkToPlaceCall(MainCallDataStruct* data)
+  explicit GetProfilePageCall(WebsiteCallDataStruct* data)
       : data_(data), responder_(&ctx_), status_(REQUEST) {
-    data->service_->RequestOkToPlace(&ctx_, &request_, &responder_, data_->cq_,
+    data->service_->RequestGetProfilePage(&ctx_, &request_, &responder_, data_->cq_,
                               data_->cq_, this);
   }
 
   void Proceed() {
 
     switch (status_) {
-      case REQUEST:
-        new OkToPlaceCall(data_);
-
-        // TODO: check mem usage
-        cout << "running ok to place check w/ curr q length of " << data_->proc_queue->get_qlen() << endl;
-        reply_.set_oktoplace(data_->proc_queue->ok_to_place(request_.compdeadline(), request_.compceil()));
-        reply_.set_ratio(data_->proc_queue->get_max_ratio());
+      case REQUEST: {
+        new GetProfilePageCall(data_);
+        
+        // TODO: make this more real? 
+        long long sum = 0;
+        for (long long i = 0; i < 1000000000; i++) {
+            sum = 3 * i + 1;
+        }
+        reply_.set_retval(sum);
+                
 
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
         break;
-
+      }
       case FINISH:
         delete this;
         break;
@@ -76,21 +70,21 @@ class OkToPlaceCall final : public Call {
   }
 
  private:
-  MainCallDataStruct* data_;
+  WebsiteCallDataStruct* data_;
   ServerContext ctx_;
 
-  ServerAsyncResponseWriter<PlacementReply> responder_;
+  ServerAsyncResponseWriter<ProfilePage> responder_;
   ProcInfo request_;
-  PlacementReply reply_;
+  ProfilePage reply_;
 
   enum CallStatus { REQUEST, FINISH };
   CallStatus status_;
 };
 
 
-class MainServerImp final {
+class WebsiteServerImp final {
  public:
-  ~MainServerImp() {
+  ~WebsiteServerImp() {
     server_->Shutdown();
     // Always shutdown the completion queue after the server.
     cq_->Shutdown();
@@ -122,8 +116,8 @@ class MainServerImp final {
   void HandleRpcs() {
     
     // Spawn a new CallData instance to serve new clients.
-    MainCallDataStruct data{&service_, cq_.get(), proc_queue_};
-    new OkToPlaceCall(&data);
+    WebsiteCallDataStruct data{&service_, cq_.get()};
+    new GetProfilePageCall(&data);
     void* tag;  // uniquely identifies a request.
     bool ok;
     std::vector<std::thread> threads;
@@ -136,7 +130,7 @@ class MainServerImp final {
           continue;
         }
         // run this in a new thread
-        std::thread t(&MainServerImp::RunAndGatherData, this, curr, start_time);
+        std::thread t(&WebsiteServerImp::RunAndGatherData, this, curr, start_time);
         threads.push_back(std::move(t));
       } else {
         cout << "closing b/c returned false" << endl;
@@ -152,8 +146,15 @@ class MainServerImp final {
 
     struct rusage usage_stats;
 
-    std::thread t(&MainServerImp::runWrapper, this, toRun, &usage_stats, start_time);
+    Proc* proc = new Proc(250, 200, DYNAMIC_PAGE_GET, start_time);
+    cout << "website srv adding to proc q" << endl;
+    proc_queue_->enq(proc);
+
+    std::thread t(&WebsiteServerImp::runWrapper, this, toRun, &usage_stats, start_time);
     t.join();
+
+    proc_queue_->remove(proc);
+    delete proc;
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
     float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
@@ -177,7 +178,7 @@ class MainServerImp final {
   }
 
   std::unique_ptr<ServerCompletionQueue> cq_;
-  MainServer::AsyncService service_;
+  WebsiteServer::AsyncService service_;
   std::unique_ptr<Server> server_;
   Queue* proc_queue_;
 };

@@ -13,59 +13,68 @@ using namespace std;
 #include "lb.h"
 
 
-MainClient* LB::placeRPCCall(ProcType type) {
+WebsiteClient* LB::pickDispatcher(ProcType type) {
 
     ProcTypeProfile profile = types_.at(type);
 
     // pick a dispatcher
     vector<MainClient*> contender_dispatchers;
-    MainClient* disp_to_use;
+    WebsiteClient* disp_to_use = nullptr;
 
     int min_val = INT_MAX;
     for (auto disp : dispatchers_) {
-        PlacementReply reply = disp->OkToPlace(profile.mem->avg + profile.mem->std_dev, profile.compute_max);
+        PlacementReply reply = get<0>(disp)->OkToPlace(profile.mem->avg + profile.mem->std_dev, profile.compute_max, profile.deadline);
+        cout << "got ret val " << reply.oktoplace() << endl;
         if (reply.oktoplace() && reply.ratio() < min_val)  {
             min_val = reply.ratio();
-            disp_to_use = disp;
+            disp_to_use = get<1>(disp);
         }
     }
 
     return disp_to_use;
 }
 
+void LB::runProc(ProcTypeProfile profile, WebsiteClient* to_use) {
+
+    to_use->GetProfilePage(profile.mem->avg + profile.mem->std_dev, profile.compute_max, profile.deadline);
+}
+
 void LB::run() {
 
-    // TODO: remove this test
-    for (auto disp : dispatchers_) {
-        PlacementReply reply = disp->OkToPlace(10.0, 10.0);
-        cout << "got reply from dispatcher, ok: " << reply.oktoplace() << ", ratio: " << reply.ratio() << endl;
+    vector<thread> threads;
+
+    // gen load, place each proc
+    for (int i = 0; i < 5; i++) {
+        ProcType type = DYNAMIC_PAGE_GET;
+        ProcTypeProfile profile = types_.at(type);
+        WebsiteClient* to_use = pickDispatcher(type);
+        if (to_use == nullptr) {
+            cout << "no good dispatcher found" << endl;
+            break;
+        }
+        thread t(&LB::runProc, this, profile, to_use);
+        threads.push_back(move(t));
     }
 
-    // gen load
-    // place each proc
+    for (auto& t : threads) {
+        t.join();
+    }
 
 }
 
 
-void LB::init(int argc, char *argv[]) {
-
-    // read in all the port numbers
-    vector<string> port_numbers;
-    for (int i = 1; i < argc; ++i) {
-        string port = argv[i];
-        port_numbers.push_back(port);
-    }
-
+void LB::init() {
     // populate the proc profiles - hardcoded for now
     // TODO: this
+    // 100 MB, 200ms, 250ms
+    ProcTypeProfile dynamic = ProcTypeProfile(100, 200, 250);
+    types_.insert({DYNAMIC_PAGE_GET, dynamic});
 
     // connect to all the dispatchers
-    for (string dispatcher_port : port_numbers) {
-        string dispatcher_addr = "0.0.0.0:" + dispatcher_port;
-        MainClient* clnt = new MainClient(grpc::CreateChannel(dispatcher_addr, grpc::InsecureChannelCredentials()));
+    MainClient* main_clnt = new MainClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));
+    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()));
 
-        dispatchers_.push_back(clnt);
-    }
+    dispatchers_.push_back({main_clnt, website_clnt});
 
     cout << "LB started" << endl;
 
@@ -73,16 +82,11 @@ void LB::init(int argc, char *argv[]) {
 
 
 
-int main(int argc, char *argv[]) {
-    
-    if (argc < 2) {
-        cout << "Usage: " << argv[0] << " <port1> <port2> ... <portN>" << endl;
-        return 1;
-    }
+int main() {
     
     LB* lb = new LB();
 
-    lb->init(argc, argv);
+    lb->init();
     lb->run();
 
     return 0;

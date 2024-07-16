@@ -27,7 +27,7 @@ class Dispatcher {
             id = id_given;
         };
 
-        void run(string port);
+        void run();
 
 
     private:
