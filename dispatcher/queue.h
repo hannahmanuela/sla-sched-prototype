@@ -1,10 +1,12 @@
 #include <vector>
 #include <algorithm>
 #include <mutex>
+#include <limits>
 
 using namespace std;
 
 #include "proc.h"
+#include "consts.h"
 
 #ifndef QUEUE_H
 #define QUEUE_H
@@ -45,6 +47,25 @@ class Queue {
 
             float running_wait_time = 0;
             bool inserted = false;
+
+            map<int, float> cores_to_running_waiting_time;
+            for (int i = 0; i < NUM_CORES; i++) {
+                cores_to_running_waiting_time.insert({i, (float)0});
+            }
+
+            auto get_add_min_running_wait_time = [&cores_to_running_waiting_time](float to_add)->float { 
+                float min_val = std::numeric_limits<float>::max();
+                int min_core = -1;
+                for (int i = 0; i < NUM_CORES; i++) {
+                    if (cores_to_running_waiting_time.at(i) < min_val) {
+                        min_val = cores_to_running_waiting_time.at(i);
+                        min_core = i;
+                    }
+                }
+                // cout << "adding ceil " << to_add << " to core " << min_core << ", whose waiting time is thus now " << cores_to_running_waiting_time.at(min_core) + to_add << endl;
+                cores_to_running_waiting_time[min_core] += to_add;
+                return min_val;
+            };
             
             for (auto p : q_) {
 
@@ -52,28 +73,27 @@ class Queue {
                 // a little janky, but have to get both the new proc and the one we are currently on in the loop
                 if (new_deadline > p->deadline_ && inserted == false) {
                     float new_slack = new_deadline - new_comp_ceil;
-                    if (new_slack - running_wait_time < 0.0) {
+                    float wait_time = get_add_min_running_wait_time(p->comp_ceil_);
+                    if (new_slack - wait_time < 0.0) {
                         lock_.unlock();
-                        cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in NEW proc is only " << new_slack << endl;
+                        // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in NEW proc is only " << new_slack << endl;
                         return false;
                     }
-                    running_wait_time += new_comp_ceil;
                     
                     inserted = true;
                 }
 
                 float p_slack = p->get_deadline() - p->get_comp_ceil();
-
-                if (p_slack-running_wait_time < 0.0) {
+                float wait_time = get_add_min_running_wait_time(p->get_expected_comp_left());
+                if (p_slack-wait_time < 0.0) {
                     lock_.unlock();
-                    cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in proc is only " << p_slack << endl;
+                    // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in proc is only " << p_slack << endl;
                     return false;
                 }
-                running_wait_time += p->get_comp_ceil();
             }
             
             lock_.unlock();
-            cout << "fits!" << endl;
+            // cout << "fits!" << endl;
             return true;
         }
 

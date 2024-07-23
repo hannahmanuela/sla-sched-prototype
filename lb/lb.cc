@@ -24,7 +24,7 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
     int min_val = INT_MAX;
     for (auto disp : dispatchers_) {
         PlacementReply reply = get<0>(disp)->OkToPlace(profile.mem->avg + profile.mem->std_dev, profile.compute_max, profile.deadline);
-        cout << "got ret val " << reply.oktoplace() << endl;
+        // cout << "got ret val " << reply.oktoplace() << endl;
         if (reply.oktoplace() && reply.ratio() < min_val)  {
             min_val = reply.ratio();
             disp_to_use = get<1>(disp);
@@ -44,7 +44,7 @@ void LB::run() {
     vector<thread> threads;
 
     // gen load, place each proc
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 2; i++) {
         ProcType type = DYNAMIC_PAGE_GET;
         ProcTypeProfile profile = types_.at(type);
         WebsiteClient* to_use = pickDispatcher(type);
@@ -54,6 +54,7 @@ void LB::run() {
         }
         thread t(&LB::runProc, this, profile, to_use);
         threads.push_back(move(t));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 
     for (auto& t : threads) {

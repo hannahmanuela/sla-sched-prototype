@@ -145,30 +145,26 @@ class WebsiteServerImp final {
   void RunAndGatherData(Call* toRun, std::chrono::high_resolution_clock::time_point start_time) {
 
     struct rusage usage_stats;
+    pthread_t tid = pthread_self();
 
-    Proc* proc = new Proc(250, 200, DYNAMIC_PAGE_GET, start_time);
+    Proc* proc = new Proc(2800, 2500, DYNAMIC_PAGE_GET, start_time, tid);
     cout << "website srv adding to proc q" << endl;
     proc_queue_->enq(proc);
 
-    std::thread t(&WebsiteServerImp::runWrapper, this, toRun, &usage_stats, start_time);
-    t.join();
+    toRun->Proceed();
+
+    cout << "time gotten func giving " << proc->time_gotten() << endl;
 
     proc_queue_->remove(proc);
     delete proc;
+    
+    getrusage(RUSAGE_THREAD, &usage_stats);
     
     // usec is in microseconds so /1000 in millisec; mem used in KB so /1000 in MB
     float runtime = (usage_stats.ru_utime.tv_sec * 1000.0 + (usage_stats.ru_utime.tv_usec/1000.0))
                             + (usage_stats.ru_stime.tv_sec * 1000.0 + (usage_stats.ru_stime.tv_usec/1000.0));
     float mem_used = usage_stats.ru_maxrss / 1000;
-    cout << "got runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl; 
-
-  }
-
-  void runWrapper(Call* toRun, struct rusage* usage_stats, std::chrono::high_resolution_clock::time_point start_time) {
-
-    toRun->Proceed();
-
-    getrusage(RUSAGE_THREAD, usage_stats);
+    cout << "rusage getting runtime: " << runtime << " with wall clock time passed being " << time_since_(start_time) << ", mem used (in MB): " << mem_used << endl; 
 
   }
 
