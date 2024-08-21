@@ -24,7 +24,7 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
     int min_val = INT_MAX;
     for (auto disp : dispatchers_) {
         PlacementReply reply = get<0>(disp)->OkToPlace(profile.mem->avg + profile.mem->std_dev, profile.compute_max, profile.deadline);
-        // cout << "got ret val " << reply.oktoplace() << endl;
+        cout << "got ret val " << reply.oktoplace() << endl;
         if (reply.oktoplace() && reply.ratio() < min_val)  {
             min_val = reply.ratio();
             disp_to_use = get<1>(disp);
@@ -34,9 +34,9 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
     return disp_to_use;
 }
 
-void LB::runProc(ProcTypeProfile profile, WebsiteClient* to_use) {
-
-    to_use->GetProfilePage(profile.mem->avg + profile.mem->std_dev, profile.compute_max, profile.deadline);
+void LB::runProc(WebsiteClient* to_use) {
+    to_use->StaticGet(types_.at(STATIC_PAGE_GET).deadline, types_.at(STATIC_PAGE_GET).compute_max, 
+        types_.at(STATIC_PAGE_GET).mem->avg + types_.at(STATIC_PAGE_GET).mem->std_dev, "testStatic");
 }
 
 void LB::run() {
@@ -48,11 +48,11 @@ void LB::run() {
         ProcType type = DYNAMIC_PAGE_GET;
         ProcTypeProfile profile = types_.at(type);
         WebsiteClient* to_use = pickDispatcher(type);
-        if (to_use == nullptr) {
+        if (!to_use) {
             cout << "no good dispatcher found" << endl;
             break;
         }
-        thread t(&LB::runProc, this, profile, to_use);
+        thread t(&LB::runProc, this, to_use);
         threads.push_back(move(t));
         this_thread::sleep_for(chrono::milliseconds(10));
     }
@@ -66,10 +66,14 @@ void LB::run() {
 
 void LB::init() {
     // populate the proc profiles - hardcoded for now
+
     // TODO: this
-    // 100 MB, 200ms, 250ms
-    ProcTypeProfile dynamic = ProcTypeProfile(100, 200, 250);
-    types_.insert({DYNAMIC_PAGE_GET, dynamic});
+    // 50 MB, 10, 10ms
+    ProcTypeProfile static_get = ProcTypeProfile(50, 10, 10);
+    types_.insert({STATIC_PAGE_GET, static_get});
+
+    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 200, 250);
+    types_.insert({DYNAMIC_PAGE_GET, dynamic_get});
 
     // connect to all the dispatchers
     MainClient* main_clnt = new MainClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));

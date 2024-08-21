@@ -14,8 +14,8 @@ class Proc {
     public:
         Proc() {}
 
-        Proc(float deadline, float comp_ceil, ProcType type, std::chrono::high_resolution_clock::time_point start_time, pthread_t thread) 
-            : deadline_(deadline), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), thread_(thread) {}
+        Proc(float deadline, float comp_ceil, float mem_usg, ProcType type, std::chrono::high_resolution_clock::time_point start_time, pthread_t thread) 
+            : deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), thread_(thread) {}
         
         ~Proc() {
         }
@@ -46,6 +46,7 @@ class Proc {
 
         float deadline_; // for now in ms
         float comp_ceil_; // for now in ms
+        float expected_mem_usg_;
         std::chrono::high_resolution_clock::time_point time_spawned_; // for now in ms, from global start time
         ProcType type_;
         pthread_t thread_;

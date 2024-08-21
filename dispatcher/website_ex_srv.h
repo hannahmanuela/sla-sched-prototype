@@ -24,8 +24,8 @@ using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
 using mainserver::WebsiteServer;
-using mainserver::ProcInfo;
-using mainserver::ProfilePage;
+using mainserver::InpVal;
+using mainserver::RetVal;
 
 // Simple POD struct used as an argument wrapper for calls
 struct WebsiteCallDataStruct {
@@ -33,11 +33,21 @@ struct WebsiteCallDataStruct {
   ServerCompletionQueue* cq_;
 };
 
-class GetProfilePageCall final : public Call {
+class WebsiteCall {
  public:
-  explicit GetProfilePageCall(WebsiteCallDataStruct* data)
+  virtual void Proceed() = 0;
+  virtual bool isDone() = 0;
+  virtual ProcType getType() = 0;
+  virtual float getDeadline() = 0;
+  virtual float getCompCeil() = 0;
+  virtual float getMemUsg() = 0;
+};
+
+class StaticGetCall final : public WebsiteCall {
+ public:
+  explicit StaticGetCall(WebsiteCallDataStruct* data)
       : data_(data), responder_(&ctx_), status_(REQUEST) {
-    data->service_->RequestGetProfilePage(&ctx_, &request_, &responder_, data_->cq_,
+    data->service_->RequestStaticGet(&ctx_, &request_, &responder_, data_->cq_,
                               data_->cq_, this);
   }
 
@@ -45,7 +55,72 @@ class GetProfilePageCall final : public Call {
 
     switch (status_) {
       case REQUEST: {
-        new GetProfilePageCall(data_);
+        new StaticGetCall(data_);
+
+        cout << "starting static get" << endl;
+        
+        // TODO: make this more real? 
+        long long sum = 0;
+        for (long long i = 0; i < 1000000000; i++) {
+            sum = 3 * i + 1;
+        }
+        reply_.set_retval(sum);
+
+        cout << "done w/ static get" << endl;
+                
+
+        status_ = FINISH;
+        responder_.Finish(reply_, Status::OK, this);
+        break;
+      }
+      case FINISH:
+        delete this;
+        break;
+    }
+  }
+
+  bool isDone() {
+    return status_ == FINISH;
+  }
+
+  ProcType getType() {
+    return STATIC_PAGE_GET;
+  }
+  float getDeadline() {
+    return request_.procinfo().compdeadline();
+  }
+  float getCompCeil() {
+    return request_.procinfo().compceil();
+  }
+  float getMemUsg() {
+    return request_.procinfo().memusg();
+  }
+
+ private:
+  WebsiteCallDataStruct* data_;
+  ServerContext ctx_;
+
+  ServerAsyncResponseWriter<RetVal> responder_;
+  InpVal request_;
+  RetVal reply_;
+
+  enum CallStatus { REQUEST, FINISH };
+  CallStatus status_;
+};
+
+class DynamicGetCall final : public WebsiteCall {
+ public:
+  explicit DynamicGetCall(WebsiteCallDataStruct* data)
+      : data_(data), responder_(&ctx_), status_(REQUEST) {
+    data->service_->RequestDynamicGet(&ctx_, &request_, &responder_, data_->cq_,
+                              data_->cq_, this);
+  }
+
+  void Proceed() {
+
+    switch (status_) {
+      case REQUEST: {
+        new DynamicGetCall(data_);
         
         // TODO: make this more real? 
         long long sum = 0;
@@ -69,13 +144,148 @@ class GetProfilePageCall final : public Call {
     return status_ == FINISH;
   }
 
+  ProcType getType() {
+    return DYNAMIC_PAGE_GET;
+  }
+  float getDeadline() {
+    return request_.procinfo().compdeadline();
+  }
+  float getCompCeil() {
+    return request_.procinfo().compceil();
+  }
+  float getMemUsg() {
+    return request_.procinfo().memusg();
+  }
+
  private:
   WebsiteCallDataStruct* data_;
   ServerContext ctx_;
 
-  ServerAsyncResponseWriter<ProfilePage> responder_;
-  ProcInfo request_;
-  ProfilePage reply_;
+  ServerAsyncResponseWriter<RetVal> responder_;
+  InpVal request_;
+  RetVal reply_;
+
+  enum CallStatus { REQUEST, FINISH };
+  CallStatus status_;
+};
+
+class ProcessFgCall final : public WebsiteCall {
+ public:
+  explicit ProcessFgCall(WebsiteCallDataStruct* data)
+      : data_(data), responder_(&ctx_), status_(REQUEST) {
+    data->service_->RequestProcessFg(&ctx_, &request_, &responder_, data_->cq_,
+                              data_->cq_, this);
+  }
+
+  void Proceed() {
+
+    switch (status_) {
+      case REQUEST: {
+        new ProcessFgCall(data_);
+        
+        // TODO: make this more real? 
+        long long sum = 0;
+        for (long long i = 0; i < 1000000000; i++) {
+            sum = 3 * i + 1;
+        }
+        reply_.set_retval(sum);
+                
+
+        status_ = FINISH;
+        responder_.Finish(reply_, Status::OK, this);
+        break;
+      }
+      case FINISH:
+        delete this;
+        break;
+    }
+  }
+
+  bool isDone() {
+    return status_ == FINISH;
+  }
+
+  ProcType getType() {
+    return DATA_PROCESS_FG;
+  }
+  float getDeadline() {
+    return request_.procinfo().compdeadline();
+  }
+  float getCompCeil() {
+    return request_.procinfo().compceil();
+  }
+  float getMemUsg() {
+    return request_.procinfo().memusg();
+  }
+
+ private:
+  WebsiteCallDataStruct* data_;
+  ServerContext ctx_;
+
+  ServerAsyncResponseWriter<RetVal> responder_;
+  InpVal request_;
+  RetVal reply_;
+
+  enum CallStatus { REQUEST, FINISH };
+  CallStatus status_;
+};
+
+class ProcessBgCall final : public WebsiteCall {
+ public:
+  explicit ProcessBgCall(WebsiteCallDataStruct* data)
+      : data_(data), responder_(&ctx_), status_(REQUEST) {
+    data->service_->RequestProcessBg(&ctx_, &request_, &responder_, data_->cq_,
+                              data_->cq_, this);
+  }
+
+  void Proceed() {
+
+    switch (status_) {
+      case REQUEST: {
+        new ProcessBgCall(data_);
+        
+        // TODO: make this more real? 
+        long long sum = 0;
+        for (long long i = 0; i < 1000000000; i++) {
+            sum = 3 * i + 1;
+        }
+        reply_.set_retval(sum);
+                
+
+        status_ = FINISH;
+        responder_.Finish(reply_, Status::OK, this);
+        break;
+      }
+      case FINISH:
+        delete this;
+        break;
+    }
+  }
+
+  bool isDone() {
+    return status_ == FINISH;
+  }
+
+  ProcType getType() {
+    return DATA_PROCESS_BG;
+  }
+  float getDeadline() {
+    return request_.procinfo().compdeadline();
+  }
+  float getCompCeil() {
+    return request_.procinfo().compceil();
+  }
+  float getMemUsg() {
+    return request_.procinfo().memusg();
+  }
+
+ private:
+  WebsiteCallDataStruct* data_;
+  ServerContext ctx_;
+
+  ServerAsyncResponseWriter<RetVal> responder_;
+  InpVal request_;
+  RetVal reply_;
 
   enum CallStatus { REQUEST, FINISH };
   CallStatus status_;
@@ -117,13 +327,14 @@ class WebsiteServerImp final {
     
     // Spawn a new CallData instance to serve new clients.
     WebsiteCallDataStruct data{&service_, cq_.get()};
-    new GetProfilePageCall(&data);
+    new StaticGetCall(&data);
+    new DynamicGetCall(&data);
     void* tag;  // uniquely identifies a request.
     bool ok;
     std::vector<std::thread> threads;
     while (true) {
       if (cq_->Next(&tag, &ok) && ok) {
-        Call* curr = static_cast<Call*>(tag);
+        WebsiteCall* curr = static_cast<WebsiteCall*>(tag);
         std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
         if (curr->isDone()) {
           curr->Proceed();
@@ -142,12 +353,12 @@ class WebsiteServerImp final {
     }
   }
 
-  void RunAndGatherData(Call* toRun, std::chrono::high_resolution_clock::time_point start_time) {
+  void RunAndGatherData(WebsiteCall* toRun, std::chrono::high_resolution_clock::time_point start_time) {
 
     struct rusage usage_stats;
     pthread_t tid = pthread_self();
 
-    Proc* proc = new Proc(2800, 2500, DYNAMIC_PAGE_GET, start_time, tid);
+    Proc* proc = new Proc(toRun->getDeadline(), toRun->getCompCeil(), toRun->getMemUsg(), toRun->getType(), start_time, tid);
     cout << "website srv adding to proc q" << endl;
     proc_queue_->enq(proc);
 

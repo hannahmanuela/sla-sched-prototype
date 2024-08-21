@@ -21,7 +21,7 @@ class LB {
 
         void init();
         void run();
-        void runProc(ProcTypeProfile profile, WebsiteClient* to_use);
+        void runProc(WebsiteClient* to_use);
 
     private:
 

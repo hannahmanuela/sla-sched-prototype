@@ -19,13 +19,24 @@ message PlacementReply {
   float ratio = 2;
 }
 
+message InpVal {
+  ProcInfo procInfo = 1;
+  string testInp = 2;
+}
+
 
 service WebsiteServer {
 
-    rpc GetProfilePage(ProcInfo) returns (ProfilePage) {}
+    rpc StaticGet(InpVal) returns (RetVal) {}
+
+    rpc DynamicGet(InpVal) returns (RetVal) {}
+
+    rpc ProcessFg(InpVal) returns (RetVal) {}
+
+    rpc ProcessBg(InpVal) returns (RetVal) {}
 
 }
 
-message ProfilePage {
+message RetVal {
   uint64 retVal = 1;
 }
