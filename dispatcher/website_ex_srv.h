@@ -89,8 +89,8 @@ class WebsiteServerImp final {
         // run everything else on any core >= 2
         cpu_set_t  mask;
         CPU_ZERO(&mask);
-        int num_cpus = std::thread::hardware_concurrency();
-        for (int i = 2; i < num_cpus; i++) {
+        int num_cores = std::thread::hardware_concurrency();
+        for (int i = 2; i < num_cores; i++) {
           CPU_SET(i, &mask);
         }
         if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {

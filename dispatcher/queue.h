@@ -18,6 +18,7 @@ class Queue {
         Queue() {
             vector<Proc*> q_;
             mutex lock_;
+            int num_cores_ = std::thread::hardware_concurrency() - 2;
         };
 
         // this is ok I think because when I loop it is evaluated only once (so loop may become stale while its running but vec won't change under its feet)
@@ -49,14 +50,14 @@ class Queue {
             bool inserted = false;
 
             map<int, float> cores_to_running_waiting_time;
-            for (int i = 0; i < NUM_CORES; i++) {
+            for (int i = 0; i < num_cores_; i++) {
                 cores_to_running_waiting_time.insert({i, (float)0});
             }
 
             auto get_add_min_running_wait_time = [&cores_to_running_waiting_time](float to_add)->float { 
                 float min_val = std::numeric_limits<float>::max();
                 int min_core = -1;
-                for (int i = 0; i < NUM_CORES; i++) {
+                for (int i = 0; i < std::thread::hardware_concurrency() - 2; i++) {
                     if (cores_to_running_waiting_time.at(i) < min_val) {
                         min_val = cores_to_running_waiting_time.at(i);
                         min_core = i;
@@ -111,6 +112,7 @@ class Queue {
     private:
         vector<Proc*> q_;
         mutex lock_;
+        int num_cores_;
 
 
 };
