@@ -19,24 +19,20 @@ message PlacementReply {
   float ratio = 2;
 }
 
-message InpVal {
+message ProcToRun {
   ProcInfo procInfo = 1;
-  string testInp = 2;
+  string typeToRun = 2;
 }
 
 
 service WebsiteServer {
 
-    rpc StaticGet(InpVal) returns (RetVal) {}
-
-    rpc DynamicGet(InpVal) returns (RetVal) {}
-
-    rpc ProcessFg(InpVal) returns (RetVal) {}
-
-    rpc ProcessBg(InpVal) returns (RetVal) {}
+    rpc MakeCall(ProcToRun) returns (RetVal) {}
 
 }
 
 message RetVal {
   uint64 retVal = 1;
+  uint64 rusage = 2;
+  uint64 timePassed = 3;
 }

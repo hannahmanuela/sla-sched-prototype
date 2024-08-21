@@ -18,18 +18,17 @@ void Dispatcher::run() {
     //     cout << "set affinity had an error" << endl;
     // }
 
-    start_time_ = std::chrono::high_resolution_clock::now();
 
     cout << "dispatcher main process: " << getpid() << endl;
 
-    // start mainSrv
-    MainServerImp server;
-    WebsiteServerImp web_server;
-
     Queue* q = new Queue();
 
+    // start mainSrv
+    MainServerImp server;
+    WebsiteServerImp web_server = WebsiteServerImp(q);
+
     std::thread t1(&MainServerImp::Run, &server, DISPATCHER_MAIN_PORT, q);
-    std::thread t2(&WebsiteServerImp::Run, &web_server, DISPATCHER_WEBSITE_PORT, q);
+    std::thread t2(&WebsiteServerImp::Run, &web_server, DISPATCHER_WEBSITE_PORT);
 
     t1.join();
     t2.join();
