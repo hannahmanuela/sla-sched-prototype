@@ -89,7 +89,7 @@ class WebsiteServerImp final {
         // run everything else on any core >= 2
         cpu_set_t  mask;
         CPU_ZERO(&mask);
-        int num_cores = std::thread::hardware_concurrency();
+        int num_cores = std::thread::hardware_concurrency() / 2;
         for (int i = 2; i < num_cores; i++) {
           CPU_SET(i, &mask);
         }
@@ -125,7 +125,6 @@ class WebsiteServerImp final {
           ms_to_sleep = 5ms;
           break;
         case DYNAMIC_PAGE_GET:
-          cout << "running dynamic" << endl;
           to_sum_to = 10000000; // ca 25-30 ms 
           ms_to_sleep = 20ms;
           break;
@@ -189,8 +188,8 @@ class WebsiteServerImp final {
         return DYNAMIC_PAGE_GET;
       } else if (type == "fg") {
         return DATA_PROCESS_FG;
-      } else if (type == "fg") {
-        return DATA_PROCESS_FG;
+      } else if (type == "bg") {
+        return DATA_PROCESS_BG;
       } else {
         cout << "OOPSSS" << endl;
         return STATIC_PAGE_GET;

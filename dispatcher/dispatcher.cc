@@ -24,10 +24,10 @@ void Dispatcher::run() {
     Queue* q = new Queue();
 
     // start mainSrv
-    MainServerImp server;
+    MainServerImp server = MainServerImp(q);
     WebsiteServerImp web_server = WebsiteServerImp(q);
 
-    std::thread t1(&MainServerImp::Run, &server, DISPATCHER_MAIN_PORT, q);
+    std::thread t1(&MainServerImp::Run, &server, DISPATCHER_MAIN_PORT);
     std::thread t2(&WebsiteServerImp::Run, &web_server, DISPATCHER_WEBSITE_PORT);
 
     t1.join();

@@ -1,2 +1,5 @@
 build/**
 .vscode/**
+
+load.txt
+latency.txt

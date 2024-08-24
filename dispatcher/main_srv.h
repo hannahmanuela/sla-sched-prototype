@@ -57,7 +57,7 @@ class OkToPlaceCall final : public MainCall {
         new OkToPlaceCall(data_);
 
         // TODO: check mem usage
-        cout << "running ok to place check w/ curr q length of " << data_->proc_queue->get_qlen() << endl;
+        // cout << "running ok to place check w/ curr q length of " << data_->proc_queue->get_qlen() << endl;
         reply_.set_oktoplace(data_->proc_queue->ok_to_place(request_.compdeadline(), request_.compceil()));
         reply_.set_ratio(data_->proc_queue->get_max_ratio());
 
@@ -96,8 +96,11 @@ class MainServerImp final {
     cq_->Shutdown();
   }
 
+  MainServerImp(Queue* q) : proc_queue_(q) {}
+  MainServerImp() {}
+
   // There is no shutdown handling in this code.
-  void Run(string port, Queue* q) {
+  void Run(string port) {
     ServerBuilder builder;
     string dispatcher_addr = "0.0.0.0:" + port;
     // Listen on the given address without any authentication mechanism.
@@ -111,8 +114,6 @@ class MainServerImp final {
     // assemble the server.
     server_ = builder.BuildAndStart();
     cout << "Server listening on " << dispatcher_addr << endl;
-
-    proc_queue_ = q;
 
     HandleRpcs();
   }

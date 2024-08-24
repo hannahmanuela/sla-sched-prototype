@@ -1,6 +1,10 @@
 #include <thread>
 #include <iostream>
 #include <climits> 
+#include <stdlib.h> 
+#include <chrono>
+#include <fstream>
+#include <sstream>
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -11,6 +15,16 @@
 using namespace std;
 
 #include "lb.h"
+
+int num_count_iter = 1;
+
+
+void writeToOutFile(string filename, string to_write) {
+    ofstream myfile;
+    myfile.open(filename, std::ios_base::app);
+    myfile << to_write;
+    myfile.close();
+}
 
 
 WebsiteClient* LB::pickDispatcher(ProcType type) {
@@ -33,31 +47,74 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
     return disp_to_use;
 }
 
-void LB::runProc(WebsiteClient* to_use, string type) {
+void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
 
-    RetVal reply = to_use->MakeCall(types_.at(STATIC_PAGE_GET).deadline, types_.at(STATIC_PAGE_GET).compute_max, 
-        types_.at(STATIC_PAGE_GET).mem->avg + types_.at(STATIC_PAGE_GET).mem->std_dev, type);
-    cout << "sum: " << reply.retval() << ", took rusage: " << reply.rusage() << " and wall-clock time " << reply.timepassed() << endl;
+    auto start_time = std::chrono::high_resolution_clock::now();
+    int iter_started = num_count_iter;
+
+    RetVal reply = to_use->MakeCall(types_.at(type).mem->avg + types_.at(type).mem->std_dev, 
+        types_.at(type).compute_max, types_.at(type).deadline, type_str);
+    
+    std::chrono::duration<double> since_start = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_time);
+    int ms_since_start = 1000 * since_start.count();
+    
+    std::ostringstream to_write;
+    to_write << iter_started << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
+        << ms_since_start << "), deadline: " << types_.at(type).deadline << (ms_since_start > types_.at(type).deadline ? " -- over DL " : "")  << endl;
+    writeToOutFile("../latency.txt", to_write.str());
 
 }
 
-void LB::run() {
+void LB::runBench() {
 
     vector<thread> threads;
 
-    // gen load, place each proc
-    for (int i = 0; i < 2; i++) {
-        ProcType type = DYNAMIC_PAGE_GET;
-        ProcTypeProfile profile = types_.at(type);
-        string type_str = "dynamic";
+    int curr_sum_load = 0;
+    int size_count_iter = 10;
+    
+    for (int i = 0; i < NUM_REPS; i++) {
+
+        int rand_perc = rand() % 100;
+
+        ProcType type = DATA_PROCESS_BG;
+        string type_str = "bg";
+
+        if (rand_perc < PERCENT_STATIC) {
+            type = STATIC_PAGE_GET;
+            type_str = "static";
+        } else if (rand_perc < PERCENT_STATIC + PERCENT_DYNAMIC) {
+            type = DYNAMIC_PAGE_GET;
+            type_str = "dynamic";
+        } else if (rand_perc < PERCENT_STATIC + PERCENT_DYNAMIC + PERCENT_FG) {
+            type = DATA_PROCESS_FG;
+            type_str = "fg";
+        }
+
         WebsiteClient* to_use = pickDispatcher(type);
         if (!to_use) {
-            cout << "no good dispatcher found" << endl;
-            break;
+            cout << "no good dispatcher found -- rejecting" << endl;
+            continue;
         }
-        thread t(&LB::runProc, this, to_use, type_str);
+
+        if (i > num_count_iter * size_count_iter) {
+            std::ostringstream to_write;
+            to_write << "load: " << num_count_iter << ": " << curr_sum_load << endl;
+            writeToOutFile("../load.txt", to_write.str());
+            num_count_iter += 1;
+            curr_sum_load = 0;
+        }
+        curr_sum_load += types_.at(type).compute_max;
+
+        thread t(&LB::runProc, this, to_use, type, type_str);
         threads.push_back(move(t));
-        this_thread::sleep_for(chrono::milliseconds(10));
+
+        // say we want to gen 27 ms of work per ms (util of 50%) => 27000 ms of work per s
+        // (weighted) avg ms of work gen by proc is ~30
+        // 27000 / 30 = 900
+        // so if we gen 900 procs per sec, we will average out correctly
+
+        this_thread::sleep_for(chrono::milliseconds(1));
+    
     }
 
     for (auto& t : threads) {
@@ -101,7 +158,7 @@ int main() {
     LB* lb = new LB();
 
     lb->init();
-    lb->run();
+    lb->runBench();
 
     return 0;
 }

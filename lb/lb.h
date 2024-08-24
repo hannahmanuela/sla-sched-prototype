@@ -20,8 +20,8 @@ class LB {
         LB() {};
 
         void init();
-        void run();
-        void runProc(WebsiteClient* to_use, string type);
+        void runBench();
+        void runProc(WebsiteClient* to_use, ProcType type, string type_str);
 
     private:
 
