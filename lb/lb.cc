@@ -62,11 +62,12 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
 
 void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
 
+    // TODO: have load added be the average expected compute until deadline
+    // (load should be basically number of CPUs)
     load_lock.lock();
     total_load += types_.at(type).compute_max;
     load_lock.unlock();
 
-    long long time_started = get_curr_time_ms();
     auto start_time = std::chrono::high_resolution_clock::now();
 
     RetVal reply = to_use->MakeCall(types_.at(type).mem->avg + types_.at(type).mem->std_dev, 
@@ -76,7 +77,7 @@ void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
     int ms_since_start = 1000 * since_start.count();
     
     std::ostringstream to_write;
-    to_write << time_started << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
+    to_write << get_curr_time_ms() << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
         << ms_since_start << "), deadline: " << types_.at(type).deadline  << endl;
     writeToOutFile(latency_file, to_write.str());
 
