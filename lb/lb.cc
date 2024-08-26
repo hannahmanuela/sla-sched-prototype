@@ -19,8 +19,7 @@ using namespace std;
 string load_file = "../load.txt";
 string latency_file = "../latency.txt";
 
-int total_load = 0;
-std::mutex load_lock;
+int curr_load_count_iter = 1;
 
 
 void writeToOutFile(string filename, string to_write) {
@@ -62,12 +61,6 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
 
 void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
 
-    // TODO: have load added be the average expected compute until deadline
-    // (load should be basically number of CPUs)
-    load_lock.lock();
-    total_load += types_.at(type).compute_max;
-    load_lock.unlock();
-
     auto start_time = std::chrono::high_resolution_clock::now();
 
     RetVal reply = to_use->MakeCall(types_.at(type).mem->avg + types_.at(type).mem->std_dev, 
@@ -81,10 +74,6 @@ void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
         << ms_since_start << "), deadline: " << types_.at(type).deadline  << endl;
     writeToOutFile(latency_file, to_write.str());
 
-    load_lock.lock();
-    total_load -= types_.at(type).compute_max;
-    load_lock.unlock();
-
 }
 
 void LB::runBench() {
@@ -96,6 +85,9 @@ void LB::runBench() {
     f1.close();
     std::ofstream f2(latency_file, std::ios::trunc);
     f2.close();
+
+    int curr_sum_load = 0;
+    int size_load_count_iter = 10;
     
     for (int i = 0; i < NUM_REPS; i++) {
 
@@ -122,13 +114,16 @@ void LB::runBench() {
         }
 
         
-        // what I actually want is load in the system...
-        load_lock.lock();
-        std::ostringstream to_write;
-        to_write << get_curr_time_ms() << ", load: " << total_load << endl;
-        writeToOutFile(load_file, to_write.str());
-        load_lock.unlock();
-
+        // what I actually want is load in the system?
+        if (i > curr_load_count_iter * size_load_count_iter) {
+            std::ostringstream to_write;
+            to_write << get_curr_time_ms() << ", load: " << curr_sum_load << endl;
+            writeToOutFile(load_file, to_write.str());
+            curr_load_count_iter += 1;
+            curr_sum_load = 0;
+        }
+        curr_sum_load += types_.at(type).compute_max;
+        
         thread t(&LB::runProc, this, to_use, type, type_str);
         threads.push_back(move(t));
 
