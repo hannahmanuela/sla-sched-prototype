@@ -1,5 +1,7 @@
 build/**
+py-env/**
 .vscode/**
 
 load.txt
 latency.txt
+util.txt

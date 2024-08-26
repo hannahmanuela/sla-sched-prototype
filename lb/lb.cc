@@ -16,7 +16,11 @@ using namespace std;
 
 #include "lb.h"
 
-int num_count_iter = 1;
+string load_file = "../load.txt";
+string latency_file = "../latency.txt";
+
+int total_load = 0;
+std::mutex load_lock;
 
 
 void writeToOutFile(string filename, string to_write) {
@@ -24,6 +28,15 @@ void writeToOutFile(string filename, string to_write) {
     myfile.open(filename, std::ios_base::app);
     myfile << to_write;
     myfile.close();
+}
+
+long long get_curr_time_ms() {
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+    auto epoch = now_ms.time_since_epoch();
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(epoch).count();
+
+    return milliseconds;
 }
 
 
@@ -49,8 +62,12 @@ WebsiteClient* LB::pickDispatcher(ProcType type) {
 
 void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
 
+    load_lock.lock();
+    total_load += types_.at(type).compute_max;
+    load_lock.unlock();
+
+    long long time_started = get_curr_time_ms();
     auto start_time = std::chrono::high_resolution_clock::now();
-    int iter_started = num_count_iter;
 
     RetVal reply = to_use->MakeCall(types_.at(type).mem->avg + types_.at(type).mem->std_dev, 
         types_.at(type).compute_max, types_.at(type).deadline, type_str);
@@ -59,9 +76,13 @@ void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
     int ms_since_start = 1000 * since_start.count();
     
     std::ostringstream to_write;
-    to_write << iter_started << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
-        << ms_since_start << "), deadline: " << types_.at(type).deadline << (ms_since_start > types_.at(type).deadline ? " -- over DL " : "")  << endl;
-    writeToOutFile("../latency.txt", to_write.str());
+    to_write << time_started << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
+        << ms_since_start << "), deadline: " << types_.at(type).deadline  << endl;
+    writeToOutFile(latency_file, to_write.str());
+
+    load_lock.lock();
+    total_load -= types_.at(type).compute_max;
+    load_lock.unlock();
 
 }
 
@@ -69,8 +90,11 @@ void LB::runBench() {
 
     vector<thread> threads;
 
-    int curr_sum_load = 0;
-    int size_count_iter = 10;
+    // truncate files to clear any previous contents
+    std::ofstream f1(load_file, std::ios::trunc);
+    f1.close();
+    std::ofstream f2(latency_file, std::ios::trunc);
+    f2.close();
     
     for (int i = 0; i < NUM_REPS; i++) {
 
@@ -96,14 +120,13 @@ void LB::runBench() {
             continue;
         }
 
-        if (i > num_count_iter * size_count_iter) {
-            std::ostringstream to_write;
-            to_write << "load: " << num_count_iter << ": " << curr_sum_load << endl;
-            writeToOutFile("../load.txt", to_write.str());
-            num_count_iter += 1;
-            curr_sum_load = 0;
-        }
-        curr_sum_load += types_.at(type).compute_max;
+        
+        // what I actually want is load in the system...
+        load_lock.lock();
+        std::ostringstream to_write;
+        to_write << get_curr_time_ms() << ", load: " << total_load << endl;
+        writeToOutFile(load_file, to_write.str());
+        load_lock.unlock();
 
         thread t(&LB::runProc, this, to_use, type, type_str);
         threads.push_back(move(t));
@@ -113,7 +136,7 @@ void LB::runBench() {
         // 27000 / 30 = 900
         // so if we gen 900 procs per sec, we will average out correctly
 
-        this_thread::sleep_for(chrono::milliseconds(1));
+        // this_thread::sleep_for(chrono::milliseconds(1));
     
     }
 

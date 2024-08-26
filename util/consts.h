@@ -7,6 +7,9 @@
 #define NSEC_PER_MSEC 1000000
 
 
+#define CORE_DISPATCHER_RUNS_ON 1
+
+
 #define NUM_REPS 1000
 
 #define PERCENT_STATIC 60
