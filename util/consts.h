@@ -1,7 +1,7 @@
 
-
+// assuming one dispatcher for now
+#define DISPATCHER_IP_ADDR "130.127.133.131"
 #define DISPATCHER_MAIN_PORT "50051"
-#define DISPATCHER_MAIN_PORT2 "50053"
 #define DISPATCHER_WEBSITE_PORT "50052"
 
 #define NSEC_PER_MSEC 1000000

@@ -53,7 +53,8 @@ class WebsiteServerImp final {
   // There is no shutdown handling in this code.
   void Run(string port) {
     ServerBuilder builder;
-    string dispatcher_addr = "0.0.0.0:" + port;
+    string disp_ip = DISPATCHER_IP_ADDR;
+    string dispatcher_addr = disp_ip + port;
     builder.AddListeningPort(dispatcher_addr, grpc::InsecureServerCredentials());
     builder.RegisterService(&service_);
     

@@ -168,8 +168,10 @@ void LB::init() {
     types_.insert({DATA_PROCESS_BG, bg});
 
     // connect to all the dispatchers
-    MainClient* main_clnt = new MainClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));
-    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()), 0);
+    string disp_addr = DISPATCHER_IP_ADDR;
+    cout << "connecting to " << disp_addr + DISPATCHER_MAIN_PORT << endl;
+    MainClient* main_clnt = new MainClient(grpc::CreateChannel(disp_addr + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));
+    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(disp_addr + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()), 0);
 
     dispatchers_.push_back({main_clnt, website_clnt});
 
