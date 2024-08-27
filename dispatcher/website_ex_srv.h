@@ -48,8 +48,7 @@ class WebsiteServerImp final {
     cq_->Shutdown();
   }
 
-  WebsiteServerImp() {}
-  WebsiteServerImp(Queue* q) : proc_queue_(q), global_start_(std::chrono::high_resolution_clock::now()) {}
+  WebsiteServerImp(Queue* q, float* curr_util, std::mutex& util_lock) : proc_queue_(q), curr_util_(curr_util), util_lock_(util_lock) {}
 
   // There is no shutdown handling in this code.
   void Run(string port) {
@@ -70,8 +69,8 @@ class WebsiteServerImp final {
  // Class encompasing the state and logic needed to serve a request.
   class CallData {
    public:
-    CallData(WebsiteServer::AsyncService * service, ServerCompletionQueue* cq, Queue* q, std::chrono::high_resolution_clock::time_point global_start)
-        : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), p_q_(q), g_s_(global_start) {
+    CallData(WebsiteServer::AsyncService * service, ServerCompletionQueue* cq, Queue* q, float *curr_util, std::mutex& util_lock)
+        : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), p_q_(q), curr_util_(curr_util), util_lock_(util_lock) {
       Proceed();
     }
 
@@ -82,7 +81,7 @@ class WebsiteServerImp final {
         service_->RequestMakeCall(&ctx_, &request_, &responder_, cq_, cq_,
                                   this);
       } else if (status_ == PROCESS) {
-        new CallData(service_, cq_, p_q_, g_s_);
+        new CallData(service_, cq_, p_q_, curr_util_, util_lock_);
 
         auto start_time = std::chrono::high_resolution_clock::now();
 
@@ -162,6 +161,9 @@ class WebsiteServerImp final {
         reply_.set_retval(sum);
         reply_.set_rusage(runtime);
         reply_.set_timepassed(time_since_(start_time));
+        util_lock_.lock();
+        reply_.set_currutil(*curr_util_);
+        util_lock_.unlock();
 
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
@@ -216,7 +218,8 @@ class WebsiteServerImp final {
     CallStatus status_; 
 
     Queue* p_q_;
-    std::chrono::high_resolution_clock::time_point g_s_;
+    float *curr_util_;
+    std::mutex& util_lock_;
   };
 
 
@@ -230,7 +233,7 @@ class WebsiteServerImp final {
         cout << "set affinity had an error" << endl;
     }
     
-    new CallData(&service_, cq_.get(), proc_queue_, global_start_);
+    new CallData(&service_, cq_.get(), proc_queue_, curr_util_, util_lock_);
     void* tag;  // uniquely identifies a request.
     bool ok;
     std::vector<std::thread> threads;
@@ -261,6 +264,7 @@ class WebsiteServerImp final {
   WebsiteServer::AsyncService service_;
   std::unique_ptr<Server> server_;
   Queue* proc_queue_;
-  std::chrono::high_resolution_clock::time_point global_start_;
+  float *curr_util_;
+  std::mutex& util_lock_;
 };
 

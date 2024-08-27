@@ -68,7 +68,7 @@ void dump_stats(const std::vector<double>& usage, const std::string& filename) {
     file << std::endl;
 }
 
-void calculate_and_dump_usage(const std::string& filename) {
+void calculate_and_dump_usage(float* curr_util, std::mutex& util_lock) {
     std::vector<CPUStats> prev_stats;
     std::vector<CPUStats> curr_stats;
 
@@ -77,6 +77,7 @@ void calculate_and_dump_usage(const std::string& filename) {
     get_stats(curr_stats);
 
     std::vector<double> usage(prev_stats.size());
+    float sum = 0.0;
 
     for (size_t i = 0; i < prev_stats.size(); ++i) {
         long long prev_idle = prev_stats[i].get_idle_time();
@@ -88,19 +89,22 @@ void calculate_and_dump_usage(const std::string& filename) {
         long long idle_diff = curr_idle - prev_idle;
 
         usage[i] = 100.0 * (1.0 - (double)idle_diff / total_diff);
+        sum += 100.0 * (1.0 - (double)idle_diff / total_diff);
     }
 
-    dump_stats(usage, filename);
+    float avg = sum / prev_stats.size();
+
+    util_lock.lock();
+    *curr_util = avg;
+    util_lock.unlock();
+    
 }
 
-void run_util_dumps() {
-    const std::string filename = "../util.txt";
-    // truncate the file to clear any previous contents
-    std::ofstream file(filename, std::ios::trunc);
+void run_util_dumps(float* curr_util, std::mutex& util_lock) {
 
     while (true) {
         // func sleeps for 10 ms and looks for the diff, logs it
-        calculate_and_dump_usage(filename);
+        calculate_and_dump_usage(curr_util, util_lock);
     }
 
 }
@@ -131,15 +135,17 @@ void Dispatcher::run() {
     cout << "dispatcher main process: " << getpid() << endl;
 
     Queue* q = new Queue();
+    float *curr_util = new float(0.0f);
+    std::mutex util_lock;
 
     // start mainSrv
     MainServerImp server = MainServerImp(q);
-    WebsiteServerImp web_server = WebsiteServerImp(q);
+    WebsiteServerImp web_server = WebsiteServerImp(q, curr_util, std::ref(util_lock));
 
     std::thread t1(&MainServerImp::Run, &server, DISPATCHER_MAIN_PORT);
     std::thread t2(&WebsiteServerImp::Run, &web_server, DISPATCHER_WEBSITE_PORT);
 
-    std::thread t3(run_util_dumps);
+    std::thread t3(run_util_dumps, curr_util, std::ref(util_lock));
 
     t1.join();
     t2.join();

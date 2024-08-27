@@ -35,4 +35,5 @@ message RetVal {
   uint64 retVal = 1;
   uint64 rusage = 2;
   uint64 timePassed = 3;
+  float currUtil = 4;
 }

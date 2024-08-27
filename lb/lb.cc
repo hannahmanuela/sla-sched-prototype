@@ -18,6 +18,7 @@ using namespace std;
 
 string load_file = "../load.txt";
 string latency_file = "../latency.txt";
+string util_file = "../util.txt";
 
 int curr_load_count_iter = 1;
 
@@ -68,11 +69,15 @@ void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
     
     std::chrono::duration<double> since_start = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - start_time);
     int ms_since_start = 1000 * since_start.count();
+
+    std::ostringstream to_write_util;
+    to_write_util << get_curr_time_ms() << " -- " << to_use->id << ": " << reply.currutil() << endl;
+    writeToOutFile(util_file, to_write_util.str());
     
-    std::ostringstream to_write;
-    to_write << get_curr_time_ms() << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
+    std::ostringstream to_write_lat;
+    to_write_lat << get_curr_time_ms() << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
         << ms_since_start << "), deadline: " << types_.at(type).deadline  << endl;
-    writeToOutFile(latency_file, to_write.str());
+    writeToOutFile(latency_file, to_write_lat.str());
 
 }
 
@@ -85,6 +90,8 @@ void LB::runBench() {
     f1.close();
     std::ofstream f2(latency_file, std::ios::trunc);
     f2.close();
+    std::ofstream f3(util_file, std::ios::trunc);
+    f3.close();
 
     int curr_sum_load = 0;
     int size_load_count_iter = 10;
@@ -162,7 +169,7 @@ void LB::init() {
 
     // connect to all the dispatchers
     MainClient* main_clnt = new MainClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));
-    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()));
+    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(string("0.0.0.0:") + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()), 0);
 
     dispatchers_.push_back({main_clnt, website_clnt});
 

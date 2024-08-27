@@ -15,8 +15,8 @@ using mainserver::RetVal;
 
 class WebsiteClient {
  public:
-  explicit WebsiteClient(std::shared_ptr<Channel> channel)
-      : stub_(WebsiteServer::NewStub(channel)) {}
+  explicit WebsiteClient(std::shared_ptr<Channel> channel, int given_id)
+      : stub_(WebsiteServer::NewStub(channel)), id(given_id) {}
 
   // Assembles the client's payload, sends it and presents the response back
   // from the server.
@@ -63,6 +63,8 @@ class WebsiteClient {
 
     return reply;
   }
+
+  int id;
 
  private:
   // Out of the passed in Channel comes the stub, stored here, our view of the
