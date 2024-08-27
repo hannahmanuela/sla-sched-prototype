@@ -54,7 +54,7 @@ class WebsiteServerImp final {
   void Run(string port) {
     ServerBuilder builder;
     string disp_ip = DISPATCHER_IP_ADDR;
-    string dispatcher_addr = disp_ip + port;
+    string dispatcher_addr = disp_ip + ":" + port;
     builder.AddListeningPort(dispatcher_addr, grpc::InsecureServerCredentials());
     builder.RegisterService(&service_);
     
