@@ -117,7 +117,7 @@ class WebsiteServerImp final {
             perror("ERROR: sched_setattr");
         }
 
-        cout << "thread id " << gettid() << endl;
+        cout << "thread id " << gettid() << " w/ deadline " << request_.procinfo().compdeadline() << endl;
 
         // run proc content function
         int to_sum_to = 0;
