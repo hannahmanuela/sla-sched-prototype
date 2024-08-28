@@ -117,6 +117,8 @@ class WebsiteServerImp final {
             perror("ERROR: sched_setattr");
         }
 
+        cout << "thread id " << gettid() << endl;
+
         // run proc content function
         int to_sum_to = 0;
         auto ms_to_sleep = 0ms;
