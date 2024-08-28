@@ -36,6 +36,8 @@ with open('latency.txt', 'r') as f:
         inside_time = int(parts[0].split(":")[3])
         deadline = int(parts[2].split(": ")[1])
         latency_percentage = (inside_time / deadline) * 100
+        if timestamp in latency_data:
+            timestamp = timestamp + 1
         latency_data[timestamp] = latency_percentage
         deadline_data[timestamp] = deadline
 
