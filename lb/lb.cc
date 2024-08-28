@@ -76,7 +76,7 @@ void LB::runProc(WebsiteClient* to_use, ProcType type, string type_str) {
     
     std::ostringstream to_write_lat;
     to_write_lat << get_curr_time_ms() << " - latency: time passed: (inside: " << reply.timepassed() << ", outside: " 
-        << ms_since_start << "), deadline: " << types_.at(type).deadline  << endl;
+        << ms_since_start << "), deadline: " << types_.at(type).deadline << ", rusage: " << reply.rusage() << endl;
     writeToOutFile(latency_file, to_write_lat.str());
 
 }
@@ -94,7 +94,7 @@ void LB::runBench() {
     f3.close();
 
     int curr_sum_load = 0;
-    int size_load_count_iter = 1;
+    int size_load_count_iter = 10;
     
     for (int i = 0; i < NUM_REPS; i++) {
 
@@ -139,7 +139,7 @@ void LB::runBench() {
         // 27000 / 30 = 900
         // so if we gen 900 procs per sec, we will average out correctly
 
-        this_thread::sleep_for(chrono::milliseconds(4));
+        this_thread::sleep_for(chrono::milliseconds(10));
     
     }
 
