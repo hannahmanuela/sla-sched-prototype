@@ -171,9 +171,10 @@ void LB::init() {
     string disp_addr = DISPATCHER_IP_ADDR;
     cout << "connecting to " << disp_addr + ":" + DISPATCHER_MAIN_PORT << endl;
     MainClient* main_clnt = new MainClient(grpc::CreateChannel(disp_addr + ":" + DISPATCHER_MAIN_PORT, grpc::InsecureChannelCredentials()));
-    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(disp_addr + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()), 0);
+    WebsiteClient* website_clnt = new WebsiteClient(grpc::CreateChannel(disp_addr + ":" + DISPATCHER_WEBSITE_PORT, grpc::InsecureChannelCredentials()), 0);
 
     dispatchers_.push_back({main_clnt, website_clnt});
+    cout << "connected to " << dispatchers_.size() << " dispatchers" << endl;
 
     cout << "LB started" << endl;
 

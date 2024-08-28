@@ -7,6 +7,7 @@
 
 
 #include <grpcpp/grpcpp.h>
+#include <absl/log/check.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 
@@ -169,7 +170,7 @@ class WebsiteServerImp final {
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
       } else {
-        // CHECK_EQ(status_, FINISH);
+        CHECK_EQ(status_, FINISH);
         // Once in the FINISH state, deallocate ourselves (CallData).
         delete this;
       }
