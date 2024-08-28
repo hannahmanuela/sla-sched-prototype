@@ -65,7 +65,7 @@ class Queue {
                         min_core = i;
                     }
                 }
-                cout << "adding ceil " << to_add << " to core " << min_core << ", whose waiting time is thus now " << cores_to_running_waiting_time.at(min_core) + to_add << endl;
+                // cout << "adding ceil " << to_add << " to core " << min_core << ", whose waiting time is thus now " << cores_to_running_waiting_time.at(min_core) + to_add << endl;
                 cores_to_running_waiting_time[min_core] += to_add;
                 return min_val;
             };
@@ -79,7 +79,7 @@ class Queue {
                     float wait_time = get_add_min_running_wait_time(p->comp_ceil_);
                     if (new_slack - wait_time < 0.0) {
                         lock_.unlock();
-                        cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in NEW proc is only " << new_slack << endl;
+                        // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in NEW proc is only " << new_slack << endl;
                         return false;
                     }
                     
@@ -90,13 +90,13 @@ class Queue {
                 float wait_time = get_add_min_running_wait_time(p->get_expected_comp_left());
                 if (p_slack-wait_time < 0.0) {
                     lock_.unlock();
-                    cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in proc is only " << p_slack << endl;
+                    // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in proc is only " << p_slack << endl;
                     return false;
                 }
             }
             
             lock_.unlock();
-            cout << "fits!" << endl;
+            // cout << "fits!" << endl;
             return true;
         }
 
