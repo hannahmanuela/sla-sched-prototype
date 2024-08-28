@@ -155,16 +155,16 @@ void LB::init() {
 
     // TODO: this
     // init_mem(MB), comp_max, dl (ms)
-    ProcTypeProfile static_get = ProcTypeProfile(50, 9, 10);
+    ProcTypeProfile static_get = ProcTypeProfile(50, 10, 11);
     types_.insert({STATIC_PAGE_GET, static_get});
     
-    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 50, 60);
+    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 55, 70);
     types_.insert({DYNAMIC_PAGE_GET, dynamic_get});
 
-    ProcTypeProfile fg = ProcTypeProfile(500, 1000, 1200);
+    ProcTypeProfile fg = ProcTypeProfile(500, 1500, 1800);
     types_.insert({DATA_PROCESS_FG, fg});
 
-    ProcTypeProfile bg = ProcTypeProfile(1000, 2800, 5000);
+    ProcTypeProfile bg = ProcTypeProfile(1000, 4000, 6000);
     types_.insert({DATA_PROCESS_BG, bg});
 
     // connect to all the dispatchers

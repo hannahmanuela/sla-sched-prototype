@@ -124,19 +124,19 @@ class WebsiteServerImp final {
         auto ms_to_sleep = 0ms;
         switch (strToPt(request_.typetorun())){
         case STATIC_PAGE_GET:
-          to_sum_to = 1000000; // ca 3 ms
+          to_sum_to = 1000000; // ca 4 ms
           ms_to_sleep = 5ms;
           break;
         case DYNAMIC_PAGE_GET:
-          to_sum_to = 10000000; // ca 25-30 ms 
+          to_sum_to = 10000000; // ca 40 ms 
           ms_to_sleep = 20ms;
           break;
         case DATA_PROCESS_FG:
-          to_sum_to = 300000000; // ca 790 ms
+          to_sum_to = 300000000; // ca 1300 ms ie 1.3 sec
           ms_to_sleep = 100ms;
           break;
         case DATA_PROCESS_BG:
-          to_sum_to = 1000000000; // ca 2650 ms ie 2.65 sec
+          to_sum_to = 1000000000; // ca 3800 ms ie 3.8 sec
           ms_to_sleep = 1000ms;
           break;
         }
