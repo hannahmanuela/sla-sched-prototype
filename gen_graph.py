@@ -49,10 +49,10 @@ latency_df = latency_df.merge(deadline_df, on='Timestamp')
 
 # Define colors for each distinct deadline value
 colors = {
-    10: 'red',   # Example color for deadline value 1000
-    60: 'blue',  # Example color for deadline value 2000
-    1200: 'green', # Example color for deadline value 3000
-    5000: 'purple' # Example color for deadline value 4000
+    16: 'red',   # Example color for deadline value 1000
+    70: 'blue',  # Example color for deadline value 2000
+    1800: 'green', # Example color for deadline value 3000
+    6500: 'purple' # Example color for deadline value 4000
 }
 
 # Map the colors to the deadlines

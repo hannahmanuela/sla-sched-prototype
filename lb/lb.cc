@@ -94,7 +94,7 @@ void LB::runBench() {
     f3.close();
 
     int curr_sum_load = 0;
-    int size_load_count_iter = 10;
+    int size_load_count_iter = 1;
     
     for (int i = 0; i < NUM_REPS; i++) {
 
@@ -155,7 +155,7 @@ void LB::init() {
 
     // TODO: this
     // init_mem(MB), comp_max, dl (ms)
-    ProcTypeProfile static_get = ProcTypeProfile(50, 10, 11);
+    ProcTypeProfile static_get = ProcTypeProfile(50, 15, 16);
     types_.insert({STATIC_PAGE_GET, static_get});
     
     ProcTypeProfile dynamic_get = ProcTypeProfile(100, 55, 70);
@@ -164,7 +164,7 @@ void LB::init() {
     ProcTypeProfile fg = ProcTypeProfile(500, 1500, 1800);
     types_.insert({DATA_PROCESS_FG, fg});
 
-    ProcTypeProfile bg = ProcTypeProfile(1000, 4000, 6000);
+    ProcTypeProfile bg = ProcTypeProfile(1000, 4500, 6500);
     types_.insert({DATA_PROCESS_BG, bg});
 
     // connect to all the dispatchers
