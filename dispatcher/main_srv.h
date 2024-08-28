@@ -58,7 +58,7 @@ class OkToPlaceCall final : public MainCall {
         new OkToPlaceCall(data_);
 
         // TODO: check mem usage
-        // cout << "running ok to place check w/ curr q length of " << data_->proc_queue->get_qlen() << endl;
+        cout << "running ok to place check w/ curr q length of " << data_->proc_queue->get_qlen() << endl;
         reply_.set_oktoplace(data_->proc_queue->ok_to_place(request_.compdeadline(), request_.compceil()));
         reply_.set_ratio(data_->proc_queue->get_max_ratio());
 
