@@ -139,7 +139,7 @@ void LB::runBench() {
         // 27000 / 30 = 900
         // so if we gen 900 procs per sec, we will average out correctly
 
-        // this_thread::sleep_for(chrono::milliseconds(1));
+        this_thread::sleep_for(chrono::milliseconds(2));
     
     }
 

@@ -33,9 +33,9 @@ with open('latency.txt', 'r') as f:
     for line in f:
         parts = line.strip().split(", ")
         timestamp = int(parts[0].split(" - latency: ")[0])
-        outside_time = int(parts[1].split(": ")[1][:-1])
+        inside_time = int(parts[0].split(":")[3])
         deadline = int(parts[2].split(": ")[1])
-        latency_percentage = (outside_time / deadline) * 100
+        latency_percentage = (inside_time / deadline) * 100
         latency_data[timestamp] = latency_percentage
         deadline_data[timestamp] = deadline
 
