@@ -147,10 +147,10 @@ void LB::init() {
 
     // TODO: this
     // init_mem(MB), comp_max, dl (ms)
-    ProcTypeProfile static_get = ProcTypeProfile(50, 11, 13);
+    ProcTypeProfile static_get = ProcTypeProfile(50, 12, 15);
     types_.insert({STATIC_PAGE_GET, static_get});
     
-    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 55, 70);
+    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 65, 80);
     types_.insert({DYNAMIC_PAGE_GET, dynamic_get});
 
     ProcTypeProfile fg = ProcTypeProfile(500, 1500, 1800);
