@@ -5,5 +5,6 @@ py-env/**
 load.txt
 latency.txt
 util.txt
+sched.txt
 
 plot.png

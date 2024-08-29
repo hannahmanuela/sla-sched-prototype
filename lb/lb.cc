@@ -15,6 +15,7 @@
 using namespace std;
 
 #include "lb.h"
+#include "utils.h"
 
 string load_file = "../load.txt";
 string latency_file = "../latency.txt";
@@ -28,15 +29,6 @@ void writeToOutFile(string filename, string to_write) {
     myfile.open(filename, std::ios_base::app);
     myfile << to_write;
     myfile.close();
-}
-
-long long get_curr_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-    auto epoch = now_ms.time_since_epoch();
-    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(epoch).count();
-
-    return milliseconds;
 }
 
 

@@ -14,6 +14,7 @@
 using namespace std;
 
 #include "consts.h"
+#include "utils.h"
 #include "queue.h"
 #include "proc.h"
 #include "main.pb.h"
@@ -23,6 +24,8 @@ using mainserver::WebsiteServer;
 using mainserver::ProcToRun;
 using mainserver::RetVal;
 
+#ifndef WEBSITE_SRV_H
+#define WEBSITE_SRV_H
 
 struct sched_attr {
     uint32_t size;
@@ -41,6 +44,8 @@ struct sched_attr {
     uint64_t sched_deadline;
     uint64_t sched_period;
 };
+
+int counter = 0;
 
 class WebsiteServerImp final {
  public:
@@ -85,7 +90,7 @@ class WebsiteServerImp final {
       } else if (status_ == PROCESS) {
         new CallData(service_, cq_, p_q_, curr_util_, util_lock_);
 
-        auto start_time = std::chrono::high_resolution_clock::now();
+        long long start_time = get_curr_time_ms();
 
         // run everything else on any core >= 2
         cpu_set_t  mask;
@@ -100,14 +105,21 @@ class WebsiteServerImp final {
 
         // generate Proc
         pthread_t tid = pthread_self();
-        Proc* proc = new Proc(request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
+        Proc* proc = new Proc(counter, request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
             request_.procinfo().memusg(), strToPt(request_.typetorun()), start_time, tid);
+        counter ++;
         p_q_->enq(proc);
 
+        // id, (abs) deadline, expected comp left
+        std::vector<std::tuple<int, long long, float>> beg_procs;
+
+        for (Proc* p : p_q_->get_q()) {
+          beg_procs.push_back(std::make_tuple(p->id, p->time_spawned_ + p->deadline_, p->get_expected_comp_left()));
+        }
 
         // set slice
         struct sched_attr attr;
-        int ret = syscall(SYS_sched_getattr, gettid(), &attr, sizeof(attr), 0);;
+        int ret = syscall(SYS_sched_getattr, gettid(), &attr, sizeof(attr), 0);
         if (ret < 0) {
             perror("ERROR: sched_getattr");
         }
@@ -116,8 +128,6 @@ class WebsiteServerImp final {
         if (ret < 0) {
             perror("ERROR: sched_setattr");
         }
-
-        cout << "thread id " << gettid() << " w/ deadline " << request_.procinfo().compdeadline() << ", time since start time " << time_since_(start_time) << endl;
 
         // run proc content function
         int to_sum_to = 0;
@@ -149,7 +159,8 @@ class WebsiteServerImp final {
           sum = 3 * i + 1;
         }
 
-        cout << "thread " << gettid() <<" done w/ compute, time since start time " << time_since_(start_time) << endl;
+        int time_used = get_curr_time_ms() - start_time;
+        int proc_id = proc->id;
 
         // clean up
         p_q_->remove(proc);
@@ -166,10 +177,26 @@ class WebsiteServerImp final {
 
         reply_.set_retval(sum);
         reply_.set_rusage(runtime);
-        reply_.set_timepassed(time_since_(start_time));
+        reply_.set_timepassed(time_used);
+
         util_lock_.lock();
         reply_.set_currutil(*curr_util_);
         util_lock_.unlock();
+
+        if (time_used > request_.procinfo().compdeadline()) {
+          ofstream sched_file;
+          sched_file.open("../sched.txt", std::ios_base::app);
+          sched_file << "proc that was over: " <<  proc_id << ", dl: " << request_.procinfo().compdeadline() << ", but had runtime of: " << time_used << ", w/ rusage of " << runtime << endl;
+          sched_file << "beg: " << endl;
+          for (auto p : beg_procs) {
+            sched_file << "   id: " << get<0>(p) << ", (abs) dl: " << get<1>(p) << ", time gotten: " << get<2>(p) << endl;
+          }
+          sched_file << "end: " << endl;
+          for (auto p : p_q_->get_q()) {
+            sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
+          }
+          sched_file.close();
+        }
 
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
@@ -182,11 +209,6 @@ class WebsiteServerImp final {
 
     bool isDone() {
       return status_ == FINISH;
-    }
-
-    int time_since_(std::chrono::high_resolution_clock::time_point since) {
-      std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::high_resolution_clock::now() - since);
-      return 1000 * time_span.count();  // 1000 => shows millisec; 1000000 => shows microsec
     }
 
     ProcType strToPt(string type) {
@@ -231,6 +253,9 @@ class WebsiteServerImp final {
 
   void HandleRpcs() {
 
+    std::ofstream f("../sched.txt", std::ios::trunc);
+    f.close();
+
     // run main accept loop on cpu 1
     cpu_set_t  mask;
     CPU_ZERO(&mask);
@@ -274,3 +299,4 @@ class WebsiteServerImp final {
   std::mutex& util_lock_;
 };
 
+#endif // WEBSITE_SRV_H

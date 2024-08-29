@@ -9,6 +9,7 @@
 #include "main_srv.h"
 #include "website_ex_srv.h"
 #include "consts.h"
+#include "utils.h"
 #include "dispatcher.h"
 
 
@@ -16,15 +17,6 @@
 // --------------------------------
 // CODE THAT RUNS UTIL CHECKS
 // --------------------------------
-
-long long get_curr_time_ms() {
-    auto now = std::chrono::system_clock::now();
-    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
-    auto epoch = now_ms.time_since_epoch();
-    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(epoch).count();
-
-    return milliseconds;
-}
 
 struct CPUStats {
     long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
@@ -56,16 +48,6 @@ void get_stats(std::vector<CPUStats>& stats) {
             stats.push_back(read_stats(line));
         }
     }
-}
-
-void dump_stats(const std::vector<double>& usage, const std::string& filename) {
-    long long rn = get_curr_time_ms();
-    std::ofstream file(filename, std::ios_base::app);
-    file << rn << " -- ";
-    for (size_t i = 0; i < (std::thread::hardware_concurrency() - 2) / 2; ++i) {
-        file << i << ": " << usage[i] << ", ";
-    }
-    file << std::endl;
 }
 
 void calculate_and_dump_usage(float* curr_util, std::mutex& util_lock) {

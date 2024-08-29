@@ -4,6 +4,7 @@
 #include <time.h>
 
 #include "proc_type.h"
+#include "utils.h"
 
 #ifndef PROC_H
 #define PROC_H
@@ -14,18 +15,32 @@ class Proc {
     public:
         Proc() {}
 
-        Proc(float deadline, float comp_ceil, float mem_usg, ProcType type, std::chrono::high_resolution_clock::time_point start_time, pthread_t thread) 
-            : deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), thread_(thread) {}
+        Proc(int id_given, float deadline, float comp_ceil, float mem_usg, ProcType type, long long start_time, pthread_t thread) 
+            : id(id_given), deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), thread_(thread) {}
         
         ~Proc() {
         }
 
-        float get_deadline() {
-            return deadline_;
+        float get_slack() {
+            // time to absolute deadline - (max) time left on comp
+            long long abs_deadline = time_spawned_ + (long long) deadline_;
+            int time_to_dl = (int)(abs_deadline - get_curr_time_ms());
+            return time_to_dl - get_expected_comp_left();
         }
-        float get_comp_ceil() {
-            return comp_ceil_;
+
+        float get_expected_comp_left() {
+            return comp_ceil_ - time_gotten();
         }
+        
+        int id;
+        float deadline_; // in ms
+        float comp_ceil_; // in ms
+        float expected_mem_usg_;
+        long long time_spawned_; // in ms, from global start time
+        ProcType type_;
+        pthread_t thread_;
+
+    private:
 
         float time_gotten() {
             clockid_t thread_clock_id;
@@ -39,19 +54,6 @@ class Proc {
 
             return curr_runtime;
         }
-
-        float get_expected_comp_left() {
-            return comp_ceil_ - time_gotten();
-        }
-
-        float deadline_; // for now in ms
-        float comp_ceil_; // for now in ms
-        float expected_mem_usg_;
-        std::chrono::high_resolution_clock::time_point time_spawned_; // for now in ms, from global start time
-        ProcType type_;
-        pthread_t thread_;
-
-    private:
 
 };
 

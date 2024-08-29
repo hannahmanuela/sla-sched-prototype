@@ -39,7 +39,7 @@ class Queue {
 
         void enq(Proc* to_add) {
             lock_.lock();
-            q_.insert(upper_bound(q_.begin(), q_.end(), to_add, [](Proc* a, Proc* b) {return a->get_deadline() < b->get_deadline();}), to_add);
+            q_.insert(upper_bound(q_.begin(), q_.end(), to_add, [](Proc* a, Proc* b) {return a->deadline_ < b->deadline_;}), to_add);
             lock_.unlock();
         }
 
@@ -74,29 +74,39 @@ class Queue {
 
                 // the new proc would be here: the first time its deadline is larger
                 // a little janky, but have to get both the new proc and the one we are currently on in the loop
-                if (new_deadline > p->deadline_ && inserted == false) {
+                if (inserted == false && new_deadline > p->deadline_) {
                     float new_slack = new_deadline - new_comp_ceil;
                     float wait_time = get_add_min_running_wait_time(p->comp_ceil_);
                     if (new_slack - wait_time < 0.0) {
                         lock_.unlock();
-                        // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in NEW proc is only " << new_slack << endl;
+                        ofstream sched_file;
+                        sched_file.open("../sched.txt", std::ios_base::app);
+                        sched_file << "doesn't fit, trying to place dl: " << new_deadline << ", comp ceil: " << new_comp_ceil << " --> needed slack is " << running_wait_time << ", but NEW proc is only " << new_slack << endl;
+                        for (auto p : q_) {
+                            sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
+                        }
+                        sched_file.close();
                         return false;
                     }
                     
                     inserted = true;
                 }
 
-                float p_slack = p->get_deadline() - p->get_comp_ceil();
                 float wait_time = get_add_min_running_wait_time(p->get_expected_comp_left());
-                if (p_slack-wait_time < 0.0) {
+                if (p->get_slack() - wait_time < 0.0) {
+                    ofstream sched_file;
+                    sched_file.open("../sched.txt", std::ios_base::app);
+                    sched_file << "doesn't fit, trying to place dl: " << new_deadline << ", comp ceil: " << new_comp_ceil << " --> needed slack is " << running_wait_time << ", but slack in proc is only " << p->get_slack() << endl;
+                    for (auto p : q_) {
+                        sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
+                    }
+                    sched_file.close();
                     lock_.unlock();
-                    // cout << "doesn't fit because needed slack is " << running_wait_time << ", but slack in proc is only " << p_slack << endl;
                     return false;
                 }
             }
             
             lock_.unlock();
-            // cout << "fits!" << endl;
             return true;
         }
 
