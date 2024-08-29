@@ -1,0 +1,19 @@
+
+// assuming one dispatcher for now
+#define DISPATCHER_IP_ADDR "10.10.1.2"
+#define DISPATCHER_MAIN_PORT "50051"
+#define DISPATCHER_WEBSITE_PORT "50052"
+
+#define NSEC_PER_MSEC 1000000
+
+
+#define CORE_DISPATCHER_RUNS_ON 1
+
+
+#define NUM_REPS 10000
+
+#define PERCENT_STATIC 60
+#define PERCENT_DYNAMIC 33
+#define PERCENT_FG 6
+#define PERCENT_BG 1
+

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package mainserver;
+
+service MainServer {
+
+    rpc OkToPlace(ProcInfo) returns (PlacementReply) {}
+
+}
+
+message ProcInfo {
+  float memUsg = 1;
+  float compCeil = 2;
+  float compDeadline = 3;
+}
+
+message PlacementReply {
+  bool okToPlace = 1;
+  float ratio = 2;
+}
+
+message ProcToRun {
+  ProcInfo procInfo = 1;
+  string typeToRun = 2;
+}
+
+
+service WebsiteServer {
+
+    rpc MakeCall(ProcToRun) returns (RetVal) {}
+
+}
+
+message RetVal {
+  uint64 retVal = 1;
+  float rusage = 2;
+  uint64 timePassed = 3;
+  float currUtil = 4;
+}

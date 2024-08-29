@@ -1,3 +1,9 @@
 build/**
+py-env/**
 .vscode/**
-*.txt
+
+load.txt
+latency.txt
+util.txt
+
+plot.png
