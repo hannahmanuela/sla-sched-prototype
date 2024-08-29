@@ -139,7 +139,7 @@ void LB::runBench() {
         // 27000 / 30 = 900
         // so if we gen 900 procs per sec, we will average out correctly
 
-        this_thread::sleep_for(chrono::milliseconds(10));
+        this_thread::sleep_for(chrono::milliseconds(2));
     
     }
 
@@ -155,7 +155,7 @@ void LB::init() {
 
     // TODO: this
     // init_mem(MB), comp_max, dl (ms)
-    ProcTypeProfile static_get = ProcTypeProfile(50, 15, 16);
+    ProcTypeProfile static_get = ProcTypeProfile(50, 11, 13);
     types_.insert({STATIC_PAGE_GET, static_get});
     
     ProcTypeProfile dynamic_get = ProcTypeProfile(100, 55, 70);

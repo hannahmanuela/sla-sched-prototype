@@ -124,7 +124,7 @@ class WebsiteServerImp final {
         auto ms_to_sleep = 0ms;
         switch (strToPt(request_.typetorun())){
         case STATIC_PAGE_GET:
-          to_sum_to = 1000000; // ca 8 ms
+          to_sum_to = 1000000; // ca 5 ms
           ms_to_sleep = 5ms;
           break;
         case DYNAMIC_PAGE_GET:
