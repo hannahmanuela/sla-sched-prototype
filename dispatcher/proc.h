@@ -1,4 +1,8 @@
 #include <vector>
+#include <fstream>
+#include <sstream>
+#include <unistd.h>
+#include <sys/syscall.h>
 #include <string>
 #include <chrono>
 #include <time.h>
@@ -15,20 +19,24 @@ class Proc {
     public:
         Proc() {}
 
-        Proc(int id_given, float deadline, float comp_ceil, float mem_usg, ProcType type, long long start_time, pthread_t thread) 
-            : id(id_given), deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), thread_(thread) {}
+        Proc(int id_given, float deadline, float comp_ceil, float mem_usg, ProcType type, long long start_time, pid_t thread) 
+            : id(id_given), deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), tid_(thread) {}
         
         ~Proc() {
         }
 
         float get_slack() {
-            // time to absolute deadline - (max) time left on comp
-            long long abs_deadline = time_spawned_ + (long long) deadline_;
-            int time_to_dl = (int)(abs_deadline - get_curr_time_ms());
-            return time_to_dl - get_expected_comp_left();
+            // OG slack - time already spent waiting
+            int og_slack = deadline_ - comp_ceil_;
+            return og_slack - wait_time();
         }
 
-        float get_expected_comp_left() {
+        float time_gotten() {
+            // time passed - time waiting
+            return (int)(get_curr_time_ms() - time_spawned_) - wait_time();
+        }
+
+        float get_expected_comp_left() {     
             return comp_ceil_ - time_gotten();
         }
         
@@ -38,22 +46,40 @@ class Proc {
         float expected_mem_usg_;
         long long time_spawned_; // in ms, from global start time
         ProcType type_;
-        pthread_t thread_;
+        pid_t tid_;
 
-    private:
+        // Function to get the waiting time in milliseconds for a specific thread
+        long long wait_time() {
+            // Construct the path to the thread's schedstat file
+            std::ostringstream schedstat_filepath;
+            schedstat_filepath << "/proc/" << tid_ << "/schedstat";
 
-        float time_gotten() {
-            clockid_t thread_clock_id;
-            struct timespec curr_time;
-            if (pthread_getcpuclockid(thread_, &thread_clock_id) != 0) {
-                return 0.0;
+            // Open the schedstat file
+            std::ifstream schedstat_file(schedstat_filepath.str());
+            if (!schedstat_file.is_open()) {
+                std::cerr << "Failed to open schedstat file: " << schedstat_filepath.str() << std::endl;
+                return -1;
             }
-            clock_gettime(thread_clock_id, &curr_time);
 
-            float curr_runtime = (curr_time.tv_sec * 1000.0 + (curr_time.tv_nsec/1000000.0));
+            // Read the necessary fields from the schedstat file
+            std::string line;
+            std::getline(schedstat_file, line);
+            schedstat_file.close();
 
-            return curr_runtime;
+            std::istringstream iss(line);
+            long long run_time_ns = 0, wait_time_ns = 0;
+            int switches = 0;
+
+            iss >> run_time_ns >> wait_time_ns >> switches;
+
+            // Convert waiting time from nanoseconds to milliseconds
+            long long wait_time_ms = wait_time_ns / 1000000;
+
+            return wait_time_ms;
         }
+
+    
+    private:
 
 };
 

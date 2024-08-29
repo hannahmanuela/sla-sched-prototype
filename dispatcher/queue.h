@@ -29,6 +29,16 @@ class Queue {
             lock_.unlock();
             return curr_q;
         }
+        
+        vector<Proc*> lock_get_q() {
+            lock_.lock();
+            vector<Proc*> curr_q = q_; 
+            return curr_q;
+        }
+        
+        void unlock_q() {
+            lock_.unlock();
+        }
 
         int get_qlen() {
             lock_.lock();
@@ -96,9 +106,12 @@ class Queue {
                 if (p->get_slack() - wait_time < 0.0) {
                     ofstream sched_file;
                     sched_file.open("../sched.txt", std::ios_base::app);
+                    if (p->get_slack() < 0.0) {
+                        sched_file << "negative slack below, maybe rusage?, curr time: " << get_curr_time_ms() << ", (abs) dl: " << p->time_spawned_ + (long long) p->deadline_ << ", expected comp left: " << p->get_expected_comp_left() << ", after having waited so far for " << p->wait_time() << endl;
+                    }
                     sched_file << "doesn't fit, trying to place dl: " << new_deadline << ", comp ceil: " << new_comp_ceil << " --> needed slack is " << running_wait_time << ", but slack in proc is only " << p->get_slack() << endl;
                     for (auto p : q_) {
-                        sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
+                        sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", expected comp left: " << p->get_expected_comp_left() << endl;
                     }
                     sched_file.close();
                     lock_.unlock();

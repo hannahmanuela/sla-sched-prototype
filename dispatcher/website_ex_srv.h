@@ -104,18 +104,22 @@ class WebsiteServerImp final {
         }
 
         // generate Proc
-        pthread_t tid = pthread_self();
+        if (gettid() == 0) {
+          cout << "WTF??" << endl;
+        }
         Proc* proc = new Proc(counter, request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
-            request_.procinfo().memusg(), strToPt(request_.typetorun()), start_time, tid);
+            request_.procinfo().memusg(), strToPt(request_.typetorun()), start_time, gettid());
         counter ++;
         p_q_->enq(proc);
 
         // id, (abs) deadline, expected comp left
         std::vector<std::tuple<int, long long, float>> beg_procs;
 
-        for (Proc* p : p_q_->get_q()) {
+        auto q = p_q_->lock_get_q();
+        for (Proc* p : q) {
           beg_procs.push_back(std::make_tuple(p->id, p->time_spawned_ + p->deadline_, p->get_expected_comp_left()));
         }
+        p_q_->unlock_q();
 
         // set slice
         struct sched_attr attr;
@@ -134,11 +138,11 @@ class WebsiteServerImp final {
         auto ms_to_sleep = 0ms;
         switch (strToPt(request_.typetorun())){
         case STATIC_PAGE_GET:
-          to_sum_to = 1000000; // ca 5 ms
+          to_sum_to = 1000000; // < 7 ms
           ms_to_sleep = 5ms;
           break;
         case DYNAMIC_PAGE_GET:
-          to_sum_to = 10000000; // ca 40 ms 
+          to_sum_to = 10000000; // < 55 ms 
           ms_to_sleep = 20ms;
           break;
         case DATA_PROCESS_FG:
@@ -192,9 +196,11 @@ class WebsiteServerImp final {
             sched_file << "   id: " << get<0>(p) << ", (abs) dl: " << get<1>(p) << ", time gotten: " << get<2>(p) << endl;
           }
           sched_file << "end: " << endl;
-          for (auto p : p_q_->get_q()) {
+          auto q = p_q_->lock_get_q();
+          for (auto p : q) {
             sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
           }
+          p_q_->unlock_q();
           sched_file.close();
         }
 
