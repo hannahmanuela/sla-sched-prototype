@@ -89,13 +89,6 @@ class Queue {
                     float wait_time = get_add_min_running_wait_time(p->comp_ceil_);
                     if (new_slack - wait_time < 0.0) {
                         lock_.unlock();
-                        ofstream sched_file;
-                        sched_file.open("../sched.txt", std::ios_base::app);
-                        sched_file << "doesn't fit, trying to place dl: " << new_deadline << ", comp ceil: " << new_comp_ceil << " --> needed slack is " << running_wait_time << ", but NEW proc is only " << new_slack << endl;
-                        for (auto p : q_) {
-                            sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
-                        }
-                        sched_file.close();
                         return false;
                     }
                     
@@ -104,16 +97,17 @@ class Queue {
 
                 float wait_time = get_add_min_running_wait_time(p->get_expected_comp_left());
                 if (p->get_slack() - wait_time < 0.0) {
-                    ofstream sched_file;
-                    sched_file.open("../sched.txt", std::ios_base::app);
+
                     if (p->get_slack() < 0.0) {
-                        sched_file << "negative slack below, maybe rusage?, curr time: " << get_curr_time_ms() << ", (abs) dl: " << p->time_spawned_ + (long long) p->deadline_ << ", expected comp left: " << p->get_expected_comp_left() << ", after having waited so far for " << p->wait_time() << endl;
+                        ofstream sched_file;
+                        sched_file.open("../sched.txt", std::ios_base::app);
+                        sched_file << "id " << p->id << " has negative slack :/ curr time is " << get_curr_time_ms() <<  " - below the whole q" << endl;
+                        for (auto p : q_) {
+                            sched_file << "   id: " << p->id << ", te: " << p->time_spawned_ << ", dl: " << p->time_spawned_ + (long long) p->deadline_ << ", time gotten: " << p->time_gotten() << endl;
+                        }
+                        sched_file.close();
                     }
-                    sched_file << "doesn't fit, trying to place dl: " << new_deadline << ", comp ceil: " << new_comp_ceil << " --> needed slack is " << running_wait_time << ", but slack in proc is only " << p->get_slack() << endl;
-                    for (auto p : q_) {
-                        sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", (rel) dl: " << p->deadline_ << ", expected comp left: " << p->get_expected_comp_left() << endl;
-                    }
-                    sched_file.close();
+
                     lock_.unlock();
                     return false;
                 }

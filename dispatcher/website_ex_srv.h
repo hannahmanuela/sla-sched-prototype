@@ -190,17 +190,7 @@ class WebsiteServerImp final {
         if (time_used > request_.procinfo().compdeadline()) {
           ofstream sched_file;
           sched_file.open("../sched.txt", std::ios_base::app);
-          sched_file << "proc that was over: " <<  proc_id << ", dl: " << request_.procinfo().compdeadline() << ", but had runtime of: " << time_used << ", w/ rusage of " << runtime << endl;
-          sched_file << "beg: " << endl;
-          for (auto p : beg_procs) {
-            sched_file << "   id: " << get<0>(p) << ", (abs) dl: " << get<1>(p) << ", time gotten: " << get<2>(p) << endl;
-          }
-          sched_file << "end: " << endl;
-          auto q = p_q_->lock_get_q();
-          for (auto p : q) {
-            sched_file << "   id: " << p->id << ", (abs) dl: " << p->time_spawned_ + p->deadline_ << ", time gotten: " << p->get_expected_comp_left() << endl;
-          }
-          p_q_->unlock_q();
+          sched_file << "proc that was over: " <<  proc_id << ", te: " << start_time << ", (rel) dl: " << request_.procinfo().compdeadline()  <<  ", but had runtime of: " << time_used << ", w/ rusage of " << runtime << endl;
           sched_file.close();
         }
 
