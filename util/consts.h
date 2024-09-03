@@ -1,6 +1,6 @@
 
 // assuming one dispatcher for now
-#define DISPATCHER_IP_ADDR "10.10.1.1"
+#define DISPATCHER_IP_ADDR "10.10.1.2"
 #define DISPATCHER_MAIN_PORT "50051"
 #define DISPATCHER_WEBSITE_PORT "50052"
 
