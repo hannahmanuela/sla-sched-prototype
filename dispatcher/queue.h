@@ -101,9 +101,9 @@ class Queue {
                     if (p->get_slack() < 0.0) {
                         ofstream sched_file;
                         sched_file.open("../sched.txt", std::ios_base::app);
-                        sched_file << "id " << p->id << " has negative slack :/ curr time is " << get_curr_time_ms() <<  " - below the whole q" << endl;
+                        sched_file << "id " << p->tid_ << " has negative slack :/ curr time is " << get_curr_time_ms() <<  " - below the whole q" << endl;
                         for (auto p : q_) {
-                            sched_file << "   id: " << p->id << ", te: " << p->time_spawned_ << ", dl: " << p->time_spawned_ + (long long) p->deadline_ << ", time gotten: " << p->time_gotten() << endl;
+                            sched_file << "   id: " << p->tid_ << ", te: " << p->time_spawned_ << ", dl: " << p->time_spawned_ + (long long) p->deadline_ << ", time gotten: " << p->time_gotten() << endl;
                         }
                         sched_file.close();
                     }

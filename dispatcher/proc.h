@@ -19,8 +19,8 @@ class Proc {
     public:
         Proc() {}
 
-        Proc(int id_given, float deadline, float comp_ceil, float mem_usg, ProcType type, long long start_time, pid_t thread) 
-            : id(id_given), deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), tid_(thread) {}
+        Proc(float deadline, float comp_ceil, float mem_usg, ProcType type, long long start_time, pid_t thread) 
+            : deadline_(deadline), expected_mem_usg_(mem_usg), time_spawned_(start_time), comp_ceil_(comp_ceil), type_(type), tid_(thread) {}
         
         ~Proc() {
         }
@@ -40,7 +40,6 @@ class Proc {
             return comp_ceil_ - time_gotten();
         }
         
-        int id;
         float deadline_; // in ms
         float comp_ceil_; // in ms
         float expected_mem_usg_;

@@ -45,8 +45,6 @@ struct sched_attr {
     uint64_t sched_period;
 };
 
-int counter = 0;
-
 class WebsiteServerImp final {
  public:
   ~WebsiteServerImp() {
@@ -107,9 +105,8 @@ class WebsiteServerImp final {
         if (gettid() == 0) {
           cout << "WTF??" << endl;
         }
-        Proc* proc = new Proc(counter, request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
+        Proc* proc = new Proc(request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
             request_.procinfo().memusg(), strToPt(request_.typetorun()), start_time, gettid());
-        counter ++;
         p_q_->enq(proc);
 
         // id, (abs) deadline, expected comp left
@@ -117,7 +114,7 @@ class WebsiteServerImp final {
 
         auto q = p_q_->lock_get_q();
         for (Proc* p : q) {
-          beg_procs.push_back(std::make_tuple(p->id, p->time_spawned_ + p->deadline_, p->get_expected_comp_left()));
+          beg_procs.push_back(std::make_tuple(p->tid_, p->time_spawned_ + p->deadline_, p->get_expected_comp_left()));
         }
         p_q_->unlock_q();
 
@@ -164,7 +161,7 @@ class WebsiteServerImp final {
         }
 
         int time_used = get_curr_time_ms() - start_time;
-        int proc_id = proc->id;
+        int proc_id = proc->tid_;
 
         // clean up
         p_q_->remove(proc);
