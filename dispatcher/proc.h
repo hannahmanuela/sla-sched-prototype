@@ -25,6 +25,11 @@ class Proc {
         ~Proc() {
         }
 
+        string string_of_proc() {
+            return std::string("id: ") + std::to_string(tid_) + ", te: " + std::to_string(time_spawned_) + ", abs dl: " + 
+                std::to_string(time_spawned_ + (long long) deadline_) +  ", dl: " + std::to_string((long long) deadline_) + ", wait time: " + std::to_string(wait_time()) + ", slack: " + std::to_string(get_slack()) + ", time gotten: " + to_string(time_gotten());
+        }
+
         float get_slack() {
             // OG slack - time already spent waiting
             int og_slack = deadline_ - comp_ceil_;

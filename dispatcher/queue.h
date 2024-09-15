@@ -84,10 +84,11 @@ class Queue {
 
                 // the new proc would be here: the first time its deadline is larger
                 // a little janky, but have to get both the new proc and the one we are currently on in the loop
-                if (inserted == false && new_deadline > p->deadline_) {
+                if (inserted == false && new_deadline < p->deadline_) {
                     float new_slack = new_deadline - new_comp_ceil;
-                    float wait_time = get_add_min_running_wait_time(p->comp_ceil_);
-                    if (new_slack - wait_time < 0.0) {
+                    float wait_time_with_new = get_add_min_running_wait_time(new_comp_ceil);
+                    // stop if either doesn't fit
+                    if (new_slack - new_slack < 0.0) {
                         lock_.unlock();
                         return false;
                     }
@@ -103,16 +104,25 @@ class Queue {
                         sched_file.open("../sched.txt", std::ios_base::app);
                         sched_file << "id " << p->tid_ << " has negative slack :/ curr time is " << get_curr_time_ms() <<  " - below the whole q" << endl;
                         for (auto p : q_) {
-                            sched_file << "   id: " << p->tid_ << ", te: " << p->time_spawned_ << ", dl: " << p->time_spawned_ + (long long) p->deadline_ << ", time gotten: " << p->time_gotten() << endl;
+                            sched_file << p->string_of_proc() << endl;
                         }
                         sched_file.close();
                     }
-
                     lock_.unlock();
                     return false;
                 }
             }
-            
+
+            if (!inserted) {
+                float new_slack = new_deadline - new_comp_ceil;
+                float wait_time = get_add_min_running_wait_time(new_comp_ceil);
+                if (new_slack - wait_time < 0.0) {
+                    lock_.unlock();
+                    return false;
+                }
+            }
+
+
             lock_.unlock();
             return true;
         }

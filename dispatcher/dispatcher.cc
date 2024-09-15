@@ -136,6 +136,9 @@ void Dispatcher::run() {
 
 int main() {
 
+    std::ofstream f1("../sched.txt", std::ios::trunc);
+    f1.close();
+
     // create dispatcher instance
     // hardcoding id for now
     Dispatcher d = Dispatcher(0);

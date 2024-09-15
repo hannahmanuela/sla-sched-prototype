@@ -87,6 +87,7 @@ void LB::runBench() {
 
     int curr_sum_load = 0;
     int size_load_count_iter = 10;
+    int ms_to_wait = 2;
     
     for (int i = 0; i < NUM_REPS; i++) {
 
@@ -107,8 +108,9 @@ void LB::runBench() {
         }
 
         WebsiteClient* to_use = pickDispatcher(type);
-        if (!to_use) {
-            cout << "no good dispatcher found -- rejecting" << endl;
+        if (!to_use) {            
+            this_thread::sleep_for(chrono::milliseconds(2 * ms_to_wait));
+            i -= 1;
             continue;
         }
 
@@ -131,7 +133,7 @@ void LB::runBench() {
         // 27000 / 30 = 900
         // so if we gen 900 procs per sec, we will average out correctly
 
-        this_thread::sleep_for(chrono::milliseconds(2));
+        this_thread::sleep_for(chrono::milliseconds(ms_to_wait));
     
     }
 
@@ -150,7 +152,7 @@ void LB::init() {
     ProcTypeProfile static_get = ProcTypeProfile(50, 12, 15);
     types_.insert({STATIC_PAGE_GET, static_get});
     
-    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 65, 80);
+    ProcTypeProfile dynamic_get = ProcTypeProfile(100, 80, 100);
     types_.insert({DYNAMIC_PAGE_GET, dynamic_get});
 
     ProcTypeProfile fg = ProcTypeProfile(500, 1500, 1800);
