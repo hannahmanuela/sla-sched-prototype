@@ -66,6 +66,14 @@ class Queue {
 
             int num_cores = num_cores_;
 
+            // ofstream sched_file;
+            // sched_file.open("../sched.txt", std::ios_base::app);
+            // sched_file << get_curr_time_ms() << " - trying add proc w/ cmp ceil " << new_comp_ceil << " to q: " << endl;
+            // for (auto p : q_) {
+            //     sched_file << p->string_of_proc() << endl;
+            // }
+            // sched_file.close();
+
             auto get_add_min_running_wait_time = [&cores_to_running_waiting_time, &num_cores](float to_add)->float { 
                 float min_val = std::numeric_limits<float>::max();
                 int min_core = -1;
@@ -75,7 +83,10 @@ class Queue {
                         min_core = i;
                     }
                 }
-                // cout << "adding ceil " << to_add << " to core " << min_core << ", whose waiting time is thus now " << cores_to_running_waiting_time.at(min_core) + to_add << endl;
+                // ofstream sched_file;
+                // sched_file.open("../sched.txt", std::ios_base::app);
+                // sched_file << "adding ceil " << to_add << " to core " << min_core << ", whose waiting time is thus now " << cores_to_running_waiting_time.at(min_core) + to_add << endl;
+                // sched_file.close();
                 cores_to_running_waiting_time[min_core] += to_add;
                 return min_val;
             };
@@ -90,6 +101,9 @@ class Queue {
                     // stop if either doesn't fit
                     if (new_slack - new_slack < 0.0) {
                         lock_.unlock();
+                        // sched_file.open("../sched.txt", std::ios_base::app);
+                        // sched_file << "doesn't fit" << endl;
+                        // sched_file.close();
                         return false;
                     }
                     
@@ -109,6 +123,9 @@ class Queue {
                         sched_file.close();
                     }
                     lock_.unlock();
+                    // sched_file.open("../sched.txt", std::ios_base::app);
+                    // sched_file << "doesn't fit" << endl;
+                    // sched_file.close();
                     return false;
                 }
             }
@@ -118,12 +135,18 @@ class Queue {
                 float wait_time = get_add_min_running_wait_time(new_comp_ceil);
                 if (new_slack - wait_time < 0.0) {
                     lock_.unlock();
+                    // sched_file.open("../sched.txt", std::ios_base::app);
+                    // sched_file << "doesn't fit" << endl;
+                    // sched_file.close();
                     return false;
                 }
             }
 
 
             lock_.unlock();
+            // sched_file.open("../sched.txt", std::ios_base::app);
+            // sched_file << "fits! - adding" << endl;
+            // sched_file.close();
             return true;
         }
 

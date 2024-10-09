@@ -88,23 +88,14 @@ class WebsiteServerImp final {
       } else if (status_ == PROCESS) {
         new CallData(service_, cq_, p_q_, curr_util_, util_lock_);
 
+        // ofstream sched_file;
+        // sched_file.open("../sched.txt", std::ios_base::app);
+        // sched_file << get_curr_time_ms() << " - starting thread " << gettid() << " for comp ceil " << request_.procinfo().compceil() << endl;
+        // sched_file.close();
+
         long long start_time = get_curr_time_ms();
 
-        // run everything else on any core >= 2
-        cpu_set_t  mask;
-        CPU_ZERO(&mask);
-        int num_cores = std::thread::hardware_concurrency() / 2;
-        for (int i = 2; i < num_cores; i++) {
-          CPU_SET(i, &mask);
-        }
-        if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
-            cout << "set affinity had an error" << endl;
-        }
-
         // generate Proc
-        if (gettid() == 0) {
-          cout << "WTF??" << endl;
-        }
         Proc* proc = new Proc(request_.procinfo().compdeadline(), request_.procinfo().compceil(), 
             request_.procinfo().memusg(), strToPt(request_.typetorun()), start_time, gettid());
         p_q_->enq(proc);
@@ -128,6 +119,18 @@ class WebsiteServerImp final {
         ret = syscall(SYS_sched_setattr, gettid(), &attr, 0);
         if (ret < 0) {
             perror("ERROR: sched_setattr");
+        }
+
+        // run everything else on any core >= 2
+        cpu_set_t  mask;
+        CPU_ZERO(&mask);
+        int num_cores = std::thread::hardware_concurrency() / 2;
+        for (int i = 2; i < num_cores; i++) {
+          CPU_SET(i, &mask);
+        }
+        // CPU_SET(2, &mask);
+        if ( sched_setaffinity(0, sizeof(mask), &mask) > 0) {
+            cout << "set affinity had an error" << endl;
         }
 
         // run proc content function
@@ -165,7 +168,6 @@ class WebsiteServerImp final {
 
         // clean up
         p_q_->remove(proc);
-        delete proc;
         
         // get stats, print them
         struct rusage usage_stats;
@@ -187,9 +189,11 @@ class WebsiteServerImp final {
         if (time_used > request_.procinfo().compdeadline()) {
           ofstream sched_file;
           sched_file.open("../sched.txt", std::ios_base::app);
-          sched_file << "proc that was over: " <<  proc_id << ", te: " << start_time << ", (rel) dl: " << request_.procinfo().compdeadline()  <<  ", but had runtime of: " << time_used << ", w/ rusage of " << runtime << endl;
+          sched_file << get_curr_time_ms() << " - proc that was over: " <<  proc_id << ", te: " << start_time << ", (rel) dl: " << request_.procinfo().compdeadline()  <<  ", but had runtime of: " << time_used << ", w/ rusage of " << runtime << ", wait time: " << proc->wait_time() << endl;
           sched_file.close();
         }
+
+        delete proc;
 
         status_ = FINISH;
         responder_.Finish(reply_, Status::OK, this);
